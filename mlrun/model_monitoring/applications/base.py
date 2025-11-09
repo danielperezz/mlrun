@@ -937,7 +937,7 @@ class ModelMonitoringApplicationBase(MonitoringApplicationToDict, ABC):
         write_output: bool = False,
         existing_data_handling: ExistingDataHandling = ExistingDataHandling.fail_on_overlap,
         stream_profile: Optional[ds_profile.DatastoreProfile] = None,
-    ) -> "mlrun.RunObject":
+    ) -> None:
         """
         Call this function to run the application's
         :py:meth:`~mlrun.model_monitoring.applications.ModelMonitoringApplicationBase.do_tracking`
@@ -1100,7 +1100,8 @@ class ModelMonitoringApplicationBase(MonitoringApplicationToDict, ABC):
         run_result = job.run(
             local=run_local, auto_build=auto_build, params=params, inputs=inputs
         )
-        return run_result
+        mlrun.utils.logger.info("not returning results")
+        # return run_result
 
     @abstractmethod
     def do_tracking(
