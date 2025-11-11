@@ -781,6 +781,12 @@ class ServingRuntime(RemoteRuntime):
             source=artifact.target_path,
             handler="source_code:handler",
         )
+        print("Current working directory:", os.getcwd())
+        print("Contents of cwd:", os.listdir(os.getcwd()))
+
+        file_dir = os.path.dirname(os.path.abspath(__file__))
+        print("Directory where this file resides:", file_dir)
+        print("Contents of file directory:", os.listdir(file_dir))
         return super().deploy(
             project,
             tag,
