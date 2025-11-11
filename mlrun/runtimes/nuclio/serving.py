@@ -756,7 +756,7 @@ class ServingRuntime(RemoteRuntime):
         with tempfile.TemporaryDirectory() as temp_dir:
             step1_path = os.path.join(temp_dir, "step1.py")
             step2_path = os.path.join(temp_dir, "step2.py")
-            src_code_path = os.path.join(temp_dir, "src.py")
+            src_code_path = os.path.join(temp_dir, "source_code.py")
 
             # write both files
             with open(step1_path, "w") as f:
