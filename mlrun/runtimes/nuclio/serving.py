@@ -723,7 +723,8 @@ class ServingRuntime(RemoteRuntime):
         import os
         import shutil
 
-        step1_content = """class BaseClass:
+        step1_content = """
+        class BaseClass:
             def __init__(self, context, name=None):
                 self.context = context
                 self.name = name
@@ -738,7 +739,8 @@ class ServingRuntime(RemoteRuntime):
                 return x+3
         """
 
-        step2_content = """class BaseClass:
+        step2_content = """
+        class BaseClass:
             def __init__(self, context, name=None):
                 self.context = context
                 self.name = name
