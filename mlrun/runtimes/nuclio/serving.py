@@ -780,7 +780,6 @@ class ServingRuntime(RemoteRuntime):
         self.with_source_archive(
             source=artifact.target_path,
             handler="source_code:handler",
-            workdir="."  # important: makes the archive root importable
         )
         return super().deploy(
             project,
