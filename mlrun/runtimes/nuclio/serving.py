@@ -703,6 +703,7 @@ class ServingRuntime(RemoteRuntime):
             encoded_code = mlrun.utils.helpers.encode_user_code(decoded_code)
             self.spec.build.functionSourceCode = encoded_code
 
+
         # Handle secret processing before handling child functions, since secrets are transferred to them
         if self.spec.secret_sources:
             # Before passing to remote builder, secrets values must be retrieved (for example from ENV)
@@ -718,7 +719,64 @@ class ServingRuntime(RemoteRuntime):
             self._add_ref_triggers()
             self._deploy_function_refs()
             logger.info(f"deploy root function {self.metadata.name} ...")
+        import tempfile
+        import os
+        import shutil
 
+        step1_content = """class BaseClass:
+            def __init__(self, context, name=None):
+                self.context = context
+                self.name = name
+
+
+        class Echo(BaseClass):
+            def __init__(self, name=None):
+                self.name = name
+
+            def do(self, x):
+                print("Echo:", self.name, x)
+                return x+3
+        """
+
+        step2_content = """class BaseClass:
+            def __init__(self, context, name=None):
+                self.context = context
+                self.name = name
+
+
+        class EchoHello(BaseClass):
+            def __init__(self, name=None):
+                self.name = name
+
+            def do(self, x):
+                print("Hello! Echo:", self.name, x)
+                return x+5
+        """
+        code = b64decode(self.spec.build.functionSourceCode).decode("utf-8")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            step1_path = os.path.join(temp_dir, "step1.py")
+            step2_path = os.path.join(temp_dir, "step2.py")
+            src_code_path = os.path.join(temp_dir, "src.py")
+
+            # write both files
+            with open(step1_path, "w") as f:
+                f.write(step1_content)
+
+            with open(step2_path, "w") as f:
+                f.write(step2_content)
+            with open(src_code_path, "w") as f:
+                f.write(code)
+            # create zip (archive name = path without extension)
+            zip_path = shutil.make_archive(
+                base_name=os.path.join(temp_dir, "steps"),
+                format="zip",
+                root_dir=temp_dir
+            )
+
+            print("Created zip at:", zip_path)
+            project_obj = mlrun.get_or_create_project(project)
+            artifact = project_obj.log_artifact("my_source_code",local_path=zip_path)
+        self.with_source_archive(source=artifact.target_path, handler="source_code:handler")
         return super().deploy(
             project,
             tag,
