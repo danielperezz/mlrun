@@ -754,29 +754,34 @@ class ServingRuntime(RemoteRuntime):
         """
         code = b64decode(self.spec.build.functionSourceCode).decode("utf-8")
         with tempfile.TemporaryDirectory() as temp_dir:
-            step1_path = os.path.join(temp_dir, "step1.py")
-            step2_path = os.path.join(temp_dir, "step2.py")
-            src_code_path = os.path.join(temp_dir, "source_code.py")
+            steps_dir = os.path.join(temp_dir, "steps")
+            os.makedirs(steps_dir, exist_ok=True)
 
-            # write both files
-            with open(step1_path, "w") as f:
+            with open(os.path.join(steps_dir, "__init__.py"), "w") as f:
+                f.write("")  # make it a package
+
+            with open(os.path.join(steps_dir, "step1.py"), "w") as f:
                 f.write(step1_content)
 
-            with open(step2_path, "w") as f:
+            with open(os.path.join(steps_dir, "step2.py"), "w") as f:
                 f.write(step2_content)
-            with open(src_code_path, "w") as f:
-                f.write(code)
-            # create zip (archive name = path without extension)
-            zip_path = shutil.make_archive(
-                base_name=os.path.join(temp_dir, "steps"),
-                format="zip",
-                root_dir=temp_dir
-            )
 
-            print("Created zip at:", zip_path)
+            with open(os.path.join(temp_dir, "source_code.py"), "w") as f:
+                f.write(code)
+
+            zip_path = shutil.make_archive(
+                base_name=os.path.join(temp_dir, "code"),
+                format="zip",
+                root_dir=temp_dir,  # archive root contains source_code.py and steps/
+            )
+            print("created the zip")
             project_obj = mlrun.get_or_create_project(project)
-            artifact = project_obj.log_artifact("my_source_code",local_path=zip_path)
-        self.with_source_archive(source=artifact.target_path, handler="source_code:handler")
+            artifact = project_obj.log_artifact("my_source_code", local_path=zip_path)
+        self.with_source_archive(
+            source=artifact.target_path,
+            handler="source_code:handler",
+            workdir="."  # important: makes the archive root importable
+        )
         return super().deploy(
             project,
             tag,
