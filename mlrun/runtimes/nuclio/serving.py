@@ -756,12 +756,13 @@ class ServingRuntime(RemoteRuntime):
         """
         code = b64decode(self.spec.build.functionSourceCode).decode("utf-8")
         robust_import = """
-        import os, sys
+        \nimport os, sys
         here = os.path.dirname(os.path.abspath(__file__))
         if here not in sys.path:
             sys.path.insert(0, here)
+        \n
             """
-        code = robust_import + "\n" + code
+        code = robust_import + code
         with tempfile.TemporaryDirectory() as temp_dir:
             steps_dir = os.path.join(temp_dir, "steps")
             os.makedirs(steps_dir, exist_ok=True)
