@@ -722,8 +722,8 @@ class ServingRuntime(RemoteRuntime):
         import tempfile
         import os
         import shutil
-
-        step1_content = """
+        from textwrap import dedent
+        step1_content = dedent("""
         class BaseClass:
             def __init__(self, context, name=None):
                 self.context = context
@@ -737,9 +737,9 @@ class ServingRuntime(RemoteRuntime):
             def do(self, x):
                 print("Echo:", self.name, x)
                 return x+3
-        """
+        """)
 
-        step2_content = """
+        step2_content = dedent("""
         class BaseClass:
             def __init__(self, context, name=None):
                 self.context = context
@@ -753,9 +753,9 @@ class ServingRuntime(RemoteRuntime):
             def do(self, x):
                 print("Hello! Echo:", self.name, x)
                 return x+5
-        """
+        """)
         code = b64decode(self.spec.build.functionSourceCode).decode("utf-8")
-        from textwrap import dedent
+
 
         robust_import = dedent("""\
         import os, sys
@@ -772,10 +772,10 @@ class ServingRuntime(RemoteRuntime):
                 f.write("")  # make it a package
 
             with open(os.path.join(steps_dir, "step1.py"), "w") as f:
-                f.write(step1_content)
+                f.write(step1_content.lstrip("\n"))
 
             with open(os.path.join(steps_dir, "step2.py"), "w") as f:
-                f.write(step2_content)
+                f.write(step2_content.lstrip("\n"))
 
             with open(os.path.join(temp_dir, "source_code.py"), "w") as f:
                 f.write(code)
