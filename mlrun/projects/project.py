@@ -2968,7 +2968,7 @@ class MlrunProject(ModelObj):
                 func, self
             )
             func["name"] = resolved_function_name
-            print(f"func is string and this is the spec before returning: {function_object.to_dict}")
+            print(f"func is string and this is the spec before returning: {function_object.to_dict()}")
 
         elif hasattr(func, "to_dict"):
             resolved_function_name, function_object = _init_function_from_obj(
