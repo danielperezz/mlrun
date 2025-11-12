@@ -2852,7 +2852,7 @@ class MlrunProject(ModelObj):
             requirements,
             requirements_file,
         )
-
+        mlrun.utils.logger.info(f"after _instantiate_function. spec: {function_object.to_dict()}")
         self._set_function(resolved_function_name, tag, function_object, func)
         return function_object
 
