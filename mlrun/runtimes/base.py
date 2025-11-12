@@ -813,7 +813,6 @@ class BaseRuntime(ModelObj):
 
         :return: function object
         """
-        mlrun.utils.logger.info("visiting the with_code method")
         if body and from_file:
             raise mlrun.errors.MLRunInvalidArgumentError(
                 "must provide either body or from_file argument. not both"

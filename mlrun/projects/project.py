@@ -2852,7 +2852,6 @@ class MlrunProject(ModelObj):
             requirements,
             requirements_file,
         )
-        mlrun.utils.logger.info(f"after _instantiate_function. spec: {function_object.to_dict()}")
         self._set_function(resolved_function_name, tag, function_object, func)
         return function_object
 
@@ -2969,6 +2968,7 @@ class MlrunProject(ModelObj):
                 func, self
             )
             func["name"] = resolved_function_name
+            print(f"func is string and this is the spec before returning: {function_object.to_dict}")
 
         elif hasattr(func, "to_dict"):
             resolved_function_name, function_object = _init_function_from_obj(
