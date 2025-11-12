@@ -5931,7 +5931,7 @@ def _init_function_from_dict(
                 handler=handler,
                 tag=tag,
             )
-            print(f"after code_to_function, this is spec: {func.to_dict()}}")
+            print(f"after code_to_function, this is spec: {func.to_dict()}")
 
     elif kind in mlrun.runtimes.RuntimeKinds.nuclio_runtimes():
         func = new_function(
