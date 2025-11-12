@@ -800,6 +800,7 @@ def code_to_function(
         kind=sub_kind,
         ignored_tags=ignored_tags,
     )
+    print(f"after build file #1: {spec}")
 
     spec["spec"]["env"].append(
         {
@@ -821,6 +822,7 @@ def code_to_function(
                 kind=sub_kind,
                 ignored_tags=ignored_tags,
             )
+            print(f"after build file #2: {spec}")
 
     if code_output:
         if code_output == ".":
