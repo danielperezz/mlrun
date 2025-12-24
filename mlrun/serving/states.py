@@ -3299,12 +3299,13 @@ class RootFlowStep(FlowStep):
 
 class HubTaskStep(TaskStep):
     """hub task execution step, runs a class or handler from a hub"""
+
     kind = "hub_task"
 
     def __init__(
         self,
-        hub_step_class_name: str,
         class_name: Optional[Union[str, type]] = None,
+        hub_step_class_name: Optional[str] = None,
         class_args: Optional[dict] = None,
         handler: Optional[str] = None,
         name: Optional[str] = None,
