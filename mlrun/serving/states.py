@@ -2587,6 +2587,7 @@ class FlowStep(BaseStep):
 
         for step in self.steps.values():
             step.set_parent(self)
+            logger.info("initializing step of class %s", step.__class__.__name__)
             step.init_object(context, namespace, mode, reset=reset)
         self._set_error_handler()
         self._post_init(mode)
@@ -3305,7 +3306,6 @@ class HubTaskStep(TaskStep):
     def __init__(
         self,
         class_name: Optional[Union[str, type]] = None,
-        hub_step_class_name: Optional[str] = None,
         class_args: Optional[dict] = None,
         handler: Optional[str] = None,
         name: Optional[str] = None,
@@ -3335,7 +3335,6 @@ class HubTaskStep(TaskStep):
             model_endpoint_creation_strategy=model_endpoint_creation_strategy,
             endpoint_type=endpoint_type,
         )
-        self.hub_step_class_name = hub_step_class_name
         self.requirements = requirements
 
     @staticmethod
@@ -3372,7 +3371,7 @@ class HubTaskStep(TaskStep):
             )  # TODO: consider calling it hub_url for readability
             mod = hub_step.module()
 
-        if self.handler and not self.hub_step_class_name:
+        if self.handler and not hub_step.class_name:
             self._handler = getattr(mod, self.handler)
             args = signature(self._handler).parameters
             if args and "context" in list(args.keys()):
@@ -3380,7 +3379,7 @@ class HubTaskStep(TaskStep):
             self._set_error_handler()
             return
 
-        self._class_object = getattr(mod, self.hub_step_class_name)
+        self._class_object = getattr(mod, hub_step.class_name)
 
         self._init_class_object_and_handler(namespace, reset, **extra_kwargs)
 
@@ -3643,7 +3642,6 @@ def params_to_step(
         class_name = lock_hub_uri_version(class_name, hub_step.version)
         name = get_name(name, hub_step.class_name)
         step = HubTaskStep(
-            hub_step_class_name=hub_step.class_name,
             class_name=class_name,
             class_args=class_args,
             handler=handler,
