@@ -119,8 +119,6 @@ _task_step_fields = [
     "endpoint_type",
 ]
 
-_hub_task_step_fields = _task_step_fields + ["hub_step_class_name", "requirements"]
-
 _default_fields_to_strip_from_step = [
     "model_endpoint_creation_strategy",
     "endpoint_type",
@@ -3304,12 +3302,12 @@ class HubTaskStep(TaskStep):
     """hub task execution step, runs a class or handler from a hub"""
 
     kind = "hub_task"
-    _dict_fields = _hub_task_step_fields
+    _dict_fields = _task_step_fields + ["hub_step_class_name", "requirements"]
 
     def __init__(
         self,
-        hub_step_class_name: str,
         class_name: Optional[Union[str, type]] = None,
+        hub_step_class_name: Optional[str] = None,
         class_args: Optional[dict] = None,
         handler: Optional[str] = None,
         name: Optional[str] = None,
