@@ -986,6 +986,7 @@ class ServingRuntime(RemoteRuntime):
                 if not step._is_local_function(
                     context=None, current_function=self.metadata.name
                 ):
+                    logger.info(f"step '{step.metadata.name} is not local to {self.metadata.name}")
                     continue
                 logger.info(f"Adding step '{step.metadata.name}' to requirements list of {self.metadata.name}")
                 reqs_union = merge_requirements(
