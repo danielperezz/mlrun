@@ -736,6 +736,8 @@ class ServingRuntime(RemoteRuntime):
             self._deploy_function_refs()
             logger.info(f"deploy root function {self.metadata.name} ...")
 
+        self._add_steps_requirements()
+
         return super().deploy(
             project,
             tag,
@@ -898,6 +900,8 @@ class ServingRuntime(RemoteRuntime):
             raise mlrun.errors.MLRunInvalidArgumentError(
                 f"Cannot convert function '{self.metadata.name}' to a job because it has child functions"
             )
+
+        self._add_steps_requirements()
 
         spec = KubeResourceSpec(
             image=self.spec.image,
