@@ -43,7 +43,7 @@ from mlrun.serving.states import (
     new_remote_endpoint,
     params_to_step,
 )
-from mlrun.utils import get_caller_globals, logger, set_paths, merge_requirements
+from mlrun.utils import get_caller_globals, logger, merge_requirements, set_paths
 
 from .. import KubejobRuntime
 from ..pod import KubeResourceSpec
@@ -977,8 +977,15 @@ class ServingRuntime(RemoteRuntime):
 
     def _add_steps_requirements(self):
         for step in self.spec.graph.steps.values():
-            if hasattr(step, 'requirements'):
-                reqs_union = merge_requirements(reqs_priority= self.spec.build.requirements,
-                                                reqs_secondary=step.requirements)
+            if hasattr(step, "requirements"):
+                # only add requirements to the function of this step is local to it
+                if not step._is_local_function(
+                    context=None, current_function=self.metadata.name
+                ):
+                    continue
+                reqs_union = merge_requirements(
+                    reqs_priority=self.spec.build.requirements,
+                    reqs_secondary=step.requirements,
+                )
                 self.with_requirements(requirements=reqs_union, overwrite=True)
                 break

@@ -861,9 +861,10 @@ class TaskStep(BaseStep):
                 class_object = get_class(class_name or self._default_class, namespace)
         return class_object, class_name
 
-    def _is_local_function(self, context):
+    def _is_local_function(self, context, current_function=None):
         # detect if the class is local (and should be initialized)
-        current_function = get_current_function(context)
+        if not current_function:
+            current_function = get_current_function(context)
         if current_function == "*":
             return True
         if not self.function and not current_function:
