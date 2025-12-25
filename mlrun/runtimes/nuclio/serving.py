@@ -987,6 +987,7 @@ class ServingRuntime(RemoteRuntime):
                     context=None, current_function=self.metadata.name
                 ):
                     continue
+                logger.info(f"Adding step '{step.metadata.name}' to requirements list of {self.metadata.name}")
                 reqs_union = merge_requirements(
                     reqs_priority=self.spec.build.requirements,
                     reqs_secondary=step.requirements,
