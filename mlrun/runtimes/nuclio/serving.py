@@ -981,29 +981,32 @@ class ServingRuntime(RemoteRuntime):
 
     def _add_steps_requirements(self):
         steps = getattr(getattr(self.spec, "graph", {}), "steps", {})
+
         # extract child function name from self.metadata.name if parent label exists
         full_name = self.metadata.name
-        child_name = full_name
         parent_label = (
             self.metadata.labels.get("mlrun/parent-function")
             if self.metadata.labels
             else None
         )
+        current_function = None # only set if current function is a child
         if parent_label and full_name.startswith(parent_label + "-"):
-            child_name = full_name[len(parent_label) + 1 :]
+            current_function = full_name[len(parent_label) + 1 :]
+
         build_reqs = getattr(getattr(self.spec, "build", {}), "requirements", [])
+
         for step in steps.values():
             # only add requirements to the function of this step is local to it
             if hasattr(step, "requirements"):
                 if not step._is_local_function(
-                    context=None, current_function=child_name
+                        context=None, current_function=current_function
                 ):
-                    logger.info(f"{step.name} is not local function to {child_name} (full name: {full_name}), skipping requirements merge")
+                    logger.info(f"{step.name} is not local function to {current_function} (full name: {full_name}), skipping requirements merge")
                     continue
                 reqs_union = merge_requirements(
                     reqs_priority=build_reqs,
                     reqs_secondary=getattr(step, "requirements", []),
                 )
-                logger.info(f"{step.name} is local to  {child_name} (full name: {full_name}), merging requirements")
+                logger.info(f"{step.name} is local to  {current_function} (full name: {full_name}), merging requirements")
                 logger.info(f"final merged requirements: {reqs_union}")
                 self.with_requirements(requirements=reqs_union, overwrite=True)
