@@ -998,10 +998,12 @@ class ServingRuntime(RemoteRuntime):
                 if not step._is_local_function(
                     context=None, current_function=child_name
                 ):
+                    logger.info(f"{step.name} is not local function to {child_name} (full name: {full_name}), skipping requirements merge")
                     continue
-
                 reqs_union = merge_requirements(
                     reqs_priority=build_reqs,
                     reqs_secondary=getattr(step, "requirements", []),
                 )
+                logger.info(f"{step.name} is local to  {child_name} (full name: {full_name}), merging requirements")
+                logger.info(f"final merged requirements: {reqs_union}")
                 self.with_requirements(requirements=reqs_union, overwrite=True)
