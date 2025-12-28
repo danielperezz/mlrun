@@ -3349,18 +3349,13 @@ class HubTaskStep(TaskStep):
         Directory is cleaned up automatically when the context exits.
         """
         base = tempfile.gettempdir()
-        path = os.path.join(base, "hub_step")
-
-        # Start clean
+        path = os.path.join(base, "hub_steps")
         if os.path.exists(path):
             shutil.rmtree(path)
-
         os.makedirs(path, exist_ok=True)
-
         try:
-            yield path  # Use this inside the with-block
+            yield path
         finally:
-            # Cleanup after exit
             shutil.rmtree(path, ignore_errors=True)
 
     def init_object(self, context, namespace, mode="sync", reset=False, **extra_kwargs):
@@ -3372,7 +3367,7 @@ class HubTaskStep(TaskStep):
         with self.hub_step_tempdir() as local_path:  # self-cleaning tmp dir util
             hub_step = mlrun.get_hub_step(
                 self.class_name, local_path=local_path
-            )  # TODO: consider calling it hub_url for readability
+            )
             mod = hub_step.module()
 
         if self.handler and not self.hub_step_class_name:
