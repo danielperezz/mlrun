@@ -980,37 +980,28 @@ class ServingRuntime(RemoteRuntime):
         return job
 
     def _add_steps_requirements(self):
-        for step in self.spec.graph.steps.values():
+        steps = getattr(getattr(self.spec, "graph", {}), "steps", {})
+        # extract child function name from self.metadata.name if parent label exists
+        full_name = self.metadata.name
+        child_name = full_name
+        parent_label = (
+            self.metadata.labels.get("mlrun/parent-function")
+            if self.metadata.labels
+            else None
+        )
+        if parent_label and full_name.startswith(parent_label + "-"):
+            child_name = full_name[len(parent_label) + 1 :]
+        build_reqs = getattr(getattr(self.spec, "build", {}), "requirements", [])
+        for step in steps.values():
+            # only add requirements to the function of this step is local to it
             if hasattr(step, "requirements"):
-                # only add requirements to the function of this step is local to it
-                # TODO: self.metadata.name is the full name of the function ({parent}-{child}) while step.function is only the child name
-                # Extract child function name from self.metadata.name if parent label exists
-                parent_label = self.metadata.labels.get("mlrun/parent-function") if self.metadata.labels else None
-                full_name = self.metadata.name
-                if parent_label and full_name.startswith(parent_label + "-"):
-                    child_name = full_name[len(parent_label) + 1:]
-                    logger.debug(
-                        f"Extracted child function name '{child_name}' from full name '{full_name}' using parent '{parent_label}'"
-                    )
-                else:
-                    child_name = full_name
-                    logger.debug(
-                        f"No parent label found or name does not match pattern, using full name '{full_name}' as child name"
-                    )
-
-                logger.debug(
-                    f"Checking if step '{step.name}' (step.function='{getattr(step, 'function', None)}') "
-                    f"is local to current function '{child_name}' (full name: '{full_name}')"
-                )
-                if not step._is_local_function(context=None, current_function=child_name):
-                    logger.info(
-                        f"Step '{step.name}' is not local to '{child_name}' (full name: '{full_name}')"
-                    )
+                if not step._is_local_function(
+                    context=None, current_function=child_name
+                ):
                     continue
-                logger.info(f"Adding step '{step.name}' to requirements list of {self.metadata.name}")
+
                 reqs_union = merge_requirements(
-                    reqs_priority=self.spec.build.requirements,
-                    reqs_secondary=step.requirements,
+                    reqs_priority=build_reqs,
+                    reqs_secondary=getattr(step, "requirements", []),
                 )
                 self.with_requirements(requirements=reqs_union, overwrite=True)
-                break
