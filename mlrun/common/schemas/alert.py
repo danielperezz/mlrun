@@ -27,6 +27,7 @@ class EventEntityKind(StrEnum):
     MODEL_ENDPOINT_RESULT = "model-endpoint-result"
     MODEL_MONITORING_APPLICATION = "model-monitoring-application"
     JOB = "job"
+    MODEL_MONITORING_INFRA = "model-monitoring-infra"
 
 
 class EventEntities(pydantic.v1.BaseModel):
@@ -48,6 +49,7 @@ class EventKind(StrEnum):
     MM_APP_ANOMALY_SUSPECTED = "mm-app-anomaly-suspected"
     MM_APP_FAILED = "mm-app-failed"
     FAILED = "failed"
+    MODEL_MONITORING_LAG_DETECTED = "model-monitoring-lag-detected"
 
 
 _event_kind_entity_map = {
@@ -63,6 +65,7 @@ _event_kind_entity_map = {
     EventKind.MM_APP_ANOMALY_SUSPECTED: [EventEntityKind.MODEL_ENDPOINT_RESULT],
     EventKind.MM_APP_FAILED: [EventEntityKind.MODEL_MONITORING_APPLICATION],
     EventKind.FAILED: [EventEntityKind.JOB],
+    EventKind.MODEL_MONITORING_LAG_DETECTED: [EventEntityKind.MODEL_MONITORING_INFRA],
 }
 
 
