@@ -1087,6 +1087,8 @@ class RunDBInterface(ABC):
         image: str = "mlrun/mlrun",
         deploy_histogram_data_drift_app: bool = True,
         fetch_credentials_from_sys_config: bool = False,
+        lag_threshold: int = None,
+        lag_check_interval: int = None,
     ) -> None:
         pass
 

@@ -2585,6 +2585,8 @@ class MlrunProject(ModelObj):
         deploy_histogram_data_drift_app: bool = True,
         wait_for_deployment: bool = False,
         fetch_credentials_from_sys_config: bool = False,  # deprecated
+        lag_threshold: int = None,
+        lag_check_interval: int = None,
     ) -> None:
         """
         Deploy model monitoring application controller, writer and stream functions.
@@ -2621,6 +2623,10 @@ class MlrunProject(ModelObj):
                                                   background, including the histogram data drift app if selected.
         :param fetch_credentials_from_sys_config: Deprecated. If true, fetch the credentials from the project
                                                   configuration.
+        :param lag_threshold:                    The duration in minutes that will be considered as lag in the writer.
+                                                 Minimum allowed value is 5 minutes. Default is min(60, base_period).
+        :param lag_check_interval:               The duration in minutes between consecutive lag checks in the writer
+                                                 Default is min(30, base_period/2).
         """
         if fetch_credentials_from_sys_config:
             warnings.warn(
@@ -2640,6 +2646,8 @@ class MlrunProject(ModelObj):
             base_period=base_period,
             deploy_histogram_data_drift_app=deploy_histogram_data_drift_app,
             fetch_credentials_from_sys_config=fetch_credentials_from_sys_config,
+            lag_threshold=lag_threshold,
+            lag_check_interval=lag_check_interval,
         )
 
         if wait_for_deployment:

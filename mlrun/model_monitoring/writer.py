@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import json
+import time
 import typing
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -43,7 +44,7 @@ from mlrun.model_monitoring.db._stats import (
 )
 from mlrun.model_monitoring.helpers import get_result_instance_fqn
 from mlrun.serving.utils import StepToDict
-from mlrun.utils import logger
+from mlrun.utils import logger, now_date
 
 _RawEvent = dict[str, Any]
 _AppResultEvent = NewType("_AppResultEvent", _RawEvent)
@@ -237,14 +238,26 @@ class WriterGraphFactory:
     def __init__(
         self,
         parquet_path: str,
+        lag_check_interval: int = None,
+        lag_threshold: int = None,
+        base_period: int = 10,
     ):
+        writer_config = config.model_endpoint_monitoring.writer_graph
         self.parquet_path = parquet_path
         self.parquet_batching_max_events = (
-            config.model_endpoint_monitoring.writer_graph.max_events
+            writer_config.max_events
         )
         self.parquet_batching_timeout_secs = (
-            config.model_endpoint_monitoring.writer_graph.parquet_batching_timeout_secs
+            writer_config.parquet_batching_timeout_secs
         )
+        min_valid_th = writer_config.min_allowed_lag_threshold
+        min_def_th = writer_config.min_default_lag_threshold
+        min_def_interval = writer_config.min_default_lag_check_interval
+        if lag_threshold and lag_threshold < min_valid_th:
+            raise  mlrun.errors.MLRunInvalidArgumentError(
+                f"lag_threshold must be at least {min_valid_th} minutes")
+        self.lag_threshold = lag_threshold or max(min(min_def_th, base_period), min_valid_th)
+        self.lag_check_interval = lag_check_interval or min(min_def_interval, base_period//2)
 
     def apply_writer_graph(
         self,
@@ -273,10 +286,18 @@ class WriterGraphFactory:
             project=fn.metadata.project,
         )
         graph.add_step(
+            "LagEventsGenerator",
+            "lag_events_generator",
+            after="kind_choice_step",
+            project=fn.metadata.project,
+            lag_check_interval=self.lag_check_interval,
+            lag_threshold=self.lag_threshold,
+        )
+        graph.add_step(
             "storey.Filter",
             name="filter_none",
             _fn="(event is not None)",
-            after="alert_generator",
+            after=["alert_generator", "lag_events_generator"],
         )
         graph.add_step(
             "mlrun.serving.remote.MLRunAPIRemoteStep",
@@ -364,6 +385,7 @@ class KindChoice(storey.Choice):
             raise _WriterEventValueError(
                 f"Unknown event kind: {kind}, expected one of: {WriterEventKind.list()}"
             )
+        outlets += ["lag_events_generator"]
         return outlets
 
 
@@ -445,4 +467,65 @@ class AlertGenerator(storey.MapClass):
             value_dict=event_value,
         )
 
+        return event_data
+
+
+class LagEventsGenerator(storey.MapClass):
+    def __init__(
+        self, project: str, lag_check_interval: int, lag_threshold: int, **kwargs
+    ):
+        self.project = project
+        self.lag_check_interval_sec = lag_check_interval * 60
+        self.lag_threshold_sec = lag_threshold * 60
+        self.last_check_ts = time.monotonic()
+        super().__init__(**kwargs)
+
+    def do(self, event: dict) -> Optional[dict[str, Any]]:
+        end_infer_time = event.pop(WriterEvent.END_INFER_TIME, None)
+        if end_infer_time is None:
+            return None
+
+        now = time.monotonic()
+        if now - self.last_check_ts < self.lag_check_interval_sec:
+            return None
+
+        self.last_check_ts = now
+
+        now_utc = now_date()
+        lag_sec = (now_utc - end_infer_time).total_seconds()
+        if lag_sec <= self.lag_threshold_sec:
+            return None
+
+        event_value = {
+            "app_name": event[WriterEvent.APPLICATION_NAME],
+            "model": event[WriterEvent.ENDPOINT_NAME],
+            "model_endpoint_id": event[WriterEvent.ENDPOINT_ID],
+            "lag_size": lag_sec // 60, # in minutes
+        }
+        data = self._generate_event_data(
+            entity_id=f"{self.project}.writer",
+            event_value=event_value,
+            project_name=self.project,
+        )
+        event = data.dict()
+        logger.info("Generating lag event", event=event)
+        return event
+
+    @staticmethod
+    def _generate_event_data(
+        entity_id: str,
+        event_value: dict,
+        project_name: str,
+    ) -> mlrun.common.schemas.Event:
+        entity = mlrun.common.schemas.alert.EventEntities(
+            kind=alert_objects.EventEntityKind.MODEL_MONITORING_INFRA,
+            project=project_name,
+            ids=[entity_id],
+        )
+
+        event_data = mlrun.common.schemas.Event(
+            kind=alert_objects.EventKind.MODEL_MONITORING_LAG_DETECTED,
+            entity=entity,
+            value_dict=event_value,
+        )
         return event_data

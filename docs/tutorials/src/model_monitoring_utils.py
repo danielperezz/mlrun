@@ -15,6 +15,8 @@ def enable_model_monitoring(
     base_period: int = 10,
     wait_for_deployment: bool = False,
     deploy_histogram_data_drift_app: bool = True,
+    lag_threshold: int = None,
+    lag_check_interval: int = None,
 ) -> mlrun.projects.MlrunProject:
     # Setting model monitoring creds
     tsdb_profile = DatastoreProfileV3io(name=tsdb_profile_name)
@@ -51,5 +53,7 @@ def enable_model_monitoring(
         base_period=base_period,
         wait_for_deployment=wait_for_deployment,
         deploy_histogram_data_drift_app=deploy_histogram_data_drift_app,
+        lag_threshold=lag_threshold,
+        lag_check_interval=lag_check_interval,
     )
     return project

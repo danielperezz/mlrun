@@ -143,6 +143,8 @@ def enable_model_monitoring(
             "`fetch_credentials_from_sys_config` is deprecated as of 1.10.0 and will be removed in 1.12.0."
         ),
     ),
+    lag_threshold: int = None,
+    lag_check_interval: int = None,
 ):
     """
     Deploy model monitoring application controller, writer and stream functions.
@@ -160,13 +162,18 @@ def enable_model_monitoring(
                                               By default, the image is mlrun/mlrun.
     :param deploy_histogram_data_drift_app:   If true, deploy the default histogram-based data drift application.
     :param fetch_credentials_from_sys_config: Deprecated. If true, fetch the credentials from the system configuration.
-
+    :param lag_threshold:                    The duration in minutes that will be considered as lag in the writer.
+                                             Minimum allowed value is 5 minutes. Default is min(60, base_period).
+    :param lag_check_interval:               The duration in minutes between consecutive lag checks.
+                                             Default is min(30, base_period/2).
     """
     commons.get_monitoring_deployment().deploy_monitoring_functions(
         image=image,
         base_period=base_period,
         deploy_histogram_data_drift_app=deploy_histogram_data_drift_app,
         fetch_credentials_from_sys_config=fetch_credentials_from_sys_config,
+        lag_threshold=lag_threshold,
+        lag_check_interval=lag_check_interval,
     )
 
 

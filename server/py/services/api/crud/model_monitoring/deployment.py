@@ -138,6 +138,8 @@ class MonitoringDeployment:
         image: str = "mlrun/mlrun",
         deploy_histogram_data_drift_app: bool = True,
         fetch_credentials_from_sys_config: bool = False,
+        lag_threshold: int = None,
+        lag_check_interval: int = None,
     ) -> None:
         """
         Deploy model monitoring application controller, writer and stream functions.
@@ -149,6 +151,10 @@ class MonitoringDeployment:
                                                   By default, the image is mlrun/mlrun.
         :param deploy_histogram_data_drift_app:   If true, deploy the default histogram-based data drift application.
         :param fetch_credentials_from_sys_config: If true, fetch the credentials from the system configuration.
+        :param lag_threshold:                    The duration in minutes that will be considered as lag in the writer.
+                                                 Minimum allowed value is 5 minutes. Default is min(60, base_period).
+        :param lag_check_interval:               The duration in minutes between consecutive lag checks in the writer.
+                                                 Default is min(30, base_period/2).
         """
         # check if credentials should be fetched from the system configuration or if they are already been set.
         if fetch_credentials_from_sys_config:
@@ -174,7 +180,7 @@ class MonitoringDeployment:
             controller_image=image, base_period=base_period
         )
         self.deploy_model_monitoring_writer_application(
-            writer_image=image,
+            writer_image=image, lag_threshold=lag_threshold, lag_check_interval=lag_check_interval, base_period=base_period
         )
         self.deploy_model_monitoring_stream_processing(
             stream_image=image,
@@ -300,6 +306,11 @@ class MonitoringDeployment:
         :param writer_image:                The image of the model monitoring writer function.
                                             By default, the image is mlrun/mlrun.
         :param overwrite:                   If true, overwrite the existing model monitoring writer. Default is False.
+        :param lag_threshold:               The duration in minutes that will be considered as lag in the writer.
+                                            Minimum allowed value is 5 minutes. Default is min(60, base_period).
+        :param lag_check_interval:          The duration in minutes between consecutive lag checks in the writer.
+                                            Default is min(30, base_period/2).
+        :param base_period:                 The controller base period in minutes. Used for setting default values
         """
 
         if overwrite or self._should_deploy_function(
@@ -310,7 +321,7 @@ class MonitoringDeployment:
                 project=self.project,
             )
             fn = self._initial_model_monitoring_writer_function(
-                writer_image=writer_image
+                writer_image=writer_image, lag_threshold=lag_threshold, lag_check_interval=lag_check_interval, base_period= base_period,
             )
             fn = services.api.api.endpoints.nuclio._deploy_function(
                 db_session=self.db_session,
@@ -691,12 +702,20 @@ class MonitoringDeployment:
             framework.api.utils.ensure_function_has_auth_set(function, self.auth_info)
         return function
 
-    def _initial_model_monitoring_writer_function(self, writer_image: str):
+    def _initial_model_monitoring_writer_function(self, writer_image: str,
+        lag_threshold: int = None,
+        lag_check_interval: int = None,
+        base_period: int = 10,
+                            ):
         """
         Initialize model monitoring writer function.
 
         :param writer_image:                The image of the model monitoring writer function.
-
+        :param lag_threshold:               The duration in minutes that will be considered as lag in the writer.
+                                            Minimum allowed value is 5 minutes. Default is min(60, base_period).
+        :param lag_check_interval:          The duration in minutes between consecutive lag checks.
+                                            Default is min(30, base_period/2).
+        :param base_period:                 The controller base period in minutes. Used for setting default values
         :return:                            A function object from a mlrun runtime class
         """
 
@@ -738,6 +757,9 @@ class MonitoringDeployment:
             )
             writer_factory = WriterGraphFactory(
                 parquet_path=parquet_target,
+                lag_threshold=lag_threshold,
+                lag_check_interval=lag_check_interval,
+                base_period=base_period,
             )
             writer_factory.apply_writer_graph(
                 fn=function,
