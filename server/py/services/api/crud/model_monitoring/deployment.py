@@ -180,7 +180,10 @@ class MonitoringDeployment:
             controller_image=image, base_period=base_period
         )
         self.deploy_model_monitoring_writer_application(
-            writer_image=image, lag_threshold=lag_threshold, lag_check_interval=lag_check_interval, base_period=base_period
+            writer_image=image,
+            lag_threshold=lag_threshold,
+            lag_check_interval=lag_check_interval,
+            base_period=base_period,
         )
         self.deploy_model_monitoring_stream_processing(
             stream_image=image,
@@ -296,7 +299,12 @@ class MonitoringDeployment:
             )
 
     def deploy_model_monitoring_writer_application(
-        self, writer_image: str = "mlrun/mlrun", overwrite: bool = False
+        self,
+        writer_image: str = "mlrun/mlrun",
+        overwrite: bool = False,
+        lag_threshold: int = None,
+        lag_check_interval: int = None,
+        base_period: int = 10,
     ) -> None:
         """
         Deploying model monitoring writer real time nuclio function. The goal of this real time function is
@@ -321,7 +329,10 @@ class MonitoringDeployment:
                 project=self.project,
             )
             fn = self._initial_model_monitoring_writer_function(
-                writer_image=writer_image, lag_threshold=lag_threshold, lag_check_interval=lag_check_interval, base_period= base_period,
+                writer_image=writer_image,
+                lag_threshold=lag_threshold,
+                lag_check_interval=lag_check_interval,
+                base_period=base_period,
             )
             fn = services.api.api.endpoints.nuclio._deploy_function(
                 db_session=self.db_session,
@@ -702,11 +713,13 @@ class MonitoringDeployment:
             framework.api.utils.ensure_function_has_auth_set(function, self.auth_info)
         return function
 
-    def _initial_model_monitoring_writer_function(self, writer_image: str,
+    def _initial_model_monitoring_writer_function(
+        self,
+        writer_image: str,
         lag_threshold: int = None,
         lag_check_interval: int = None,
         base_period: int = 10,
-                            ):
+    ):
         """
         Initialize model monitoring writer function.
 

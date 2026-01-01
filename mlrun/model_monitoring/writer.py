@@ -244,20 +244,21 @@ class WriterGraphFactory:
     ):
         writer_config = config.model_endpoint_monitoring.writer_graph
         self.parquet_path = parquet_path
-        self.parquet_batching_max_events = (
-            writer_config.max_events
-        )
-        self.parquet_batching_timeout_secs = (
-            writer_config.parquet_batching_timeout_secs
-        )
+        self.parquet_batching_max_events = writer_config.max_events
+        self.parquet_batching_timeout_secs = writer_config.parquet_batching_timeout_secs
         min_valid_th = writer_config.min_allowed_lag_threshold
         min_def_th = writer_config.min_default_lag_threshold
         min_def_interval = writer_config.min_default_lag_check_interval
         if lag_threshold and lag_threshold < min_valid_th:
-            raise  mlrun.errors.MLRunInvalidArgumentError(
-                f"lag_threshold must be at least {min_valid_th} minutes")
-        self.lag_threshold = lag_threshold or max(min(min_def_th, base_period), min_valid_th)
-        self.lag_check_interval = lag_check_interval or min(min_def_interval, base_period//2)
+            raise mlrun.errors.MLRunInvalidArgumentError(
+                f"lag_threshold must be at least {min_valid_th} minutes"
+            )
+        self.lag_threshold = lag_threshold or max(
+            min(min_def_th, base_period), min_valid_th
+        )
+        self.lag_check_interval = lag_check_interval or min(
+            min_def_interval, base_period // 2
+        )
 
     def apply_writer_graph(
         self,
