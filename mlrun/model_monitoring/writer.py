@@ -501,7 +501,7 @@ class LagEventsGenerator(storey.MapClass):
             "app_name": event[WriterEvent.APPLICATION_NAME],
             "model": event[WriterEvent.ENDPOINT_NAME],
             "model_endpoint_id": event[WriterEvent.ENDPOINT_ID],
-            "lag_size": lag_sec // 60, # in minutes
+            "lag_size": lag_sec // 60,  # in minutes
         }
         data = self._generate_event_data(
             entity_id=f"{self.project}.writer",
