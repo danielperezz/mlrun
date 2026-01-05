@@ -239,23 +239,20 @@ class WriterGraphFactory:
         self,
         parquet_path: str,
         lag_check_interval: int = None,
-        lag_threshold: int = None,
+        apps_lag_threshold: int = None,
         base_period: int = 10,
     ):
         writer_config = config.model_endpoint_monitoring.writer_graph
         self.parquet_path = parquet_path
         self.parquet_batching_max_events = writer_config.max_events
         self.parquet_batching_timeout_secs = writer_config.parquet_batching_timeout_secs
-        min_valid_th = writer_config.min_allowed_lag_threshold
-        min_def_th = writer_config.min_default_lag_threshold
+        min_def_th = writer_config.min_default_apps_lag_threshold
         min_def_interval = writer_config.min_default_lag_check_interval
-        if lag_threshold and lag_threshold < min_valid_th:
-            raise mlrun.errors.MLRunInvalidArgumentError(
-                f"lag_threshold must be at least {min_valid_th} minutes"
-            )
-        self.lag_threshold = lag_threshold or max(
-            min(min_def_th, base_period), min_valid_th
-        )
+        min_valid_th = writer_config.min_allowed_apps_lag_threshold
+        # self.apps_lag_threshold = apps_lag_threshold or max(
+        #     min(min_def_th, base_period), min_valid_th
+        # )
+        self.writer_lag_threshold = writer_config.writer_lag_threshold
         self.lag_check_interval = lag_check_interval or min(
             min_def_interval, base_period // 2
         )
@@ -287,18 +284,18 @@ class WriterGraphFactory:
             project=fn.metadata.project,
         )
         graph.add_step(
-            "LagEventsGenerator",
-            "lag_events_generator",
+            "WriterLagEventsGenerator",
+            "writer_lag_events_generator",
             after="kind_choice_step",
             project=fn.metadata.project,
             lag_check_interval=self.lag_check_interval,
-            lag_threshold=self.lag_threshold,
+            writer_lag_threshold=self.writer_lag_threshold,
         )
         graph.add_step(
             "storey.Filter",
             name="filter_none",
             _fn="(event is not None)",
-            after=["alert_generator", "lag_events_generator"],
+            after=["alert_generator", "writer_lag_events_generator"],
         )
         graph.add_step(
             "mlrun.serving.remote.MLRunAPIRemoteStep",
@@ -379,9 +376,9 @@ class KindChoice(storey.Choice):
         kind = event.get("kind")
         logger.info("Selecting the outlet for the event", kind=kind)
         if kind == WriterEventKind.METRIC:
-            outlets = ["tsdb_metrics", "lag_events_generator"]
+            outlets = ["tsdb_metrics", "writer_lag_events_generator"]
         elif kind == WriterEventKind.RESULT:
-            outlets = ["tsdb_app_results", "alert_generator", "lag_events_generator"]
+            outlets = ["tsdb_app_results", "alert_generator", "writer_lag_events_generator"]
         elif kind == WriterEventKind.STATS:
             outlets = ["stats_writer"]
         else:
@@ -472,19 +469,19 @@ class AlertGenerator(storey.MapClass):
         return event_data
 
 
-class LagEventsGenerator(storey.MapClass):
+class WriterLagEventsGenerator(storey.MapClass):
     def __init__(
-        self, project: str, lag_check_interval: int, lag_threshold: int, **kwargs
+        self, project: str, lag_check_interval: int, writer_lag_threshold: int, **kwargs
     ):
         self.project = project
         self.lag_check_interval_sec = lag_check_interval * 60
-        self.lag_threshold_sec = lag_threshold * 60
+        self.writer_lag_threshold_sec = writer_lag_threshold * 60
         self.last_check_ts = time.monotonic()
         super().__init__(**kwargs)
 
     def do(self, event: dict) -> Optional[dict[str, Any]]:
-        end_infer_time = event.pop(WriterEvent.END_INFER_TIME, None)
-        if end_infer_time is None:
+        end_app_process_time = event.pop(WriterEvent.END_APP_PROCESS_TIME, None)
+        if end_app_process_time is None:
             return None
 
         now = time.monotonic()
@@ -494,8 +491,8 @@ class LagEventsGenerator(storey.MapClass):
         self.last_check_ts = now
 
         now_utc = now_date()
-        lag_sec = (now_utc - end_infer_time).total_seconds()
-        if lag_sec <= self.lag_threshold_sec:
+        lag_sec = (now_utc - end_app_process_time).total_seconds()
+        if lag_sec <= self.writer_lag_threshold_sec:
             return None
 
         event_value = {

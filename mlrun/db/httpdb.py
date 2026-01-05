@@ -3990,7 +3990,7 @@ class HTTPRunDB(RunDBInterface):
         image: str = "mlrun/mlrun",
         deploy_histogram_data_drift_app: bool = True,
         fetch_credentials_from_sys_config: bool = False,
-        lag_threshold: int = None,
+        apps_lag_threshold: int = None,
         lag_check_interval: int = None,
     ) -> None:
         """
@@ -4009,10 +4009,10 @@ class HTTPRunDB(RunDBInterface):
                                                   By default, the image is mlrun/mlrun.
         :param deploy_histogram_data_drift_app:   If true, deploy the default histogram-based data drift application.
         :param fetch_credentials_from_sys_config: If true, fetch the credentials from the system configuration.
-        :param lag_threshold:                    The duration in minutes that will be considered as lag in the writer.
-                                                 Minimum allowed value is 5 minutes. Default is min(60, base_period).
-        :param lag_check_interval:               The duration in minutes between consecutive lag checks in the writer
-                                                 Default is min(30, base_period/2).
+        :param apps_lag_threshold:                The duration in minutes that will be considered as lag in the writer.
+                                                  Minimum allowed value is 5 minutes. Default is min(60, base_period).
+        :param lag_check_interval:                The duration in minutes between consecutive lag checks in the writer
+                                                  Default is min(30, base_period/2).
 
         """
         self.api_call(
@@ -4023,7 +4023,7 @@ class HTTPRunDB(RunDBInterface):
                 "image": image,
                 "deploy_histogram_data_drift_app": deploy_histogram_data_drift_app,
                 "fetch_credentials_from_sys_config": fetch_credentials_from_sys_config,
-                "lag_threshold": lag_threshold,
+                "apps_lag_threshold": apps_lag_threshold,
                 "lag_check_interval": lag_check_interval,
             },
             timeout=300,  # 5 minutes
