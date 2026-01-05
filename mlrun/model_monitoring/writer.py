@@ -367,6 +367,8 @@ class ReconstructWriterEvent(storey.MapClass):
             result_event[WriterEvent.END_INFER_TIME] = datetime.fromisoformat(
                 event[WriterEvent.END_INFER_TIME]
             )
+            if WriterEvent.END_APP_PROCESS_TIME in event:
+                result_event[WriterEvent.END_APP_PROCESS_TIME] = datetime.fromisoformat(event[WriterEvent.END_APP_PROCESS_TIME])
         if kind == WriterEventKind.STATS:
             result_event[StatsData.STATS] = json.dumps(result_event[StatsData.STATS])
         return result_event
@@ -377,16 +379,15 @@ class KindChoice(storey.Choice):
         kind = event.get("kind")
         logger.info("Selecting the outlet for the event", kind=kind)
         if kind == WriterEventKind.METRIC:
-            outlets = ["tsdb_metrics"]
+            outlets = ["tsdb_metrics", "lag_events_generator"]
         elif kind == WriterEventKind.RESULT:
-            outlets = ["tsdb_app_results", "alert_generator"]
+            outlets = ["tsdb_app_results", "alert_generator", "lag_events_generator"]
         elif kind == WriterEventKind.STATS:
             outlets = ["stats_writer"]
         else:
             raise _WriterEventValueError(
                 f"Unknown event kind: {kind}, expected one of: {WriterEventKind.list()}"
             )
-        outlets += ["lag_events_generator"]
         return outlets
 
 

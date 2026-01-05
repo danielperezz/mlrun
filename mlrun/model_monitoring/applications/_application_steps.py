@@ -25,7 +25,7 @@ import mlrun.model_monitoring.helpers
 import mlrun.platforms.iguazio
 from mlrun.serving import GraphContext
 from mlrun.serving.utils import StepToDict
-from mlrun.utils import logger
+from mlrun.utils import logger, now_date
 
 from .base import _serialize_context_and_result
 from .context import MonitoringApplicationContext
@@ -67,6 +67,9 @@ class _PushToMonitoringWriter(StepToDict):
         :param event: Monitoring result(s) to push and the original event from the controller.
         """
         application_results, application_context = event
+
+        end_app_process_time = now_date()
+        application_context.end_app_process_time = end_app_process_time
 
         writer_events = [
             _serialize_context_and_result(context=application_context, result=result)

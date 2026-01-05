@@ -187,6 +187,7 @@ class WriterEvent(MonitoringStrEnum):
     ENDPOINT_ID = "endpoint_id"
     START_INFER_TIME = "start_infer_time"
     END_INFER_TIME = "end_infer_time"
+    END_APP_PROCESS_TIME = "end_app_process_time"
     EVENT_KIND = "event_kind"  # metric or result or stats
     DATA = "data"
 
