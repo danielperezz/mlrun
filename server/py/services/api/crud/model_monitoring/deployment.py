@@ -134,7 +134,9 @@ class MonitoringDeployment:
 
     @staticmethod
     def _verify_valid_apps_lag_threshold(apps_lag_threshold: int) -> None:
-        min_valid_th = config.model_endpoint_monitoring.writer_graph.min_allowed_apps_lag_threshold
+        min_valid_th = (
+            config.model_endpoint_monitoring.writer_graph.min_allowed_apps_lag_threshold
+        )
         if apps_lag_threshold and apps_lag_threshold < min_valid_th:
             raise mlrun.errors.MLRunInvalidArgumentError(
                 f"apps_lag_threshold must be at least {min_valid_th} minutes"

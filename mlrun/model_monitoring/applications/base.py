@@ -73,8 +73,8 @@ def _serialize_context_and_result(
 
     end_app_process_time = getattr(context, "end_app_process_time", None)
     if end_app_process_time is not None:
-        writer_event[mm_constants.WriterEvent.END_APP_PROCESS_TIME] = end_app_process_time.isoformat(
-            sep=" ", timespec="microseconds"
+        writer_event[mm_constants.WriterEvent.END_APP_PROCESS_TIME] = (
+            end_app_process_time.isoformat(sep=" ", timespec="microseconds")
         )
 
     if isinstance(result, mm_results.ModelMonitoringApplicationResult):

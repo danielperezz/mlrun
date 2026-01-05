@@ -664,7 +664,7 @@ default_config = {
             "min_allowed_apps_lag_threshold": 5,
             "min_default_apps_lag_threshold": 60,
             "min_default_lag_check_interval": 30,
-            "writer_lag_threshold": 0, # todo: change to 5
+            "writer_lag_threshold": 5,
         },
         # Store prefixes are used to handle model monitoring storing policies based on project and kind, such as events,
         # stream, and endpoints.

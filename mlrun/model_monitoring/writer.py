@@ -365,7 +365,9 @@ class ReconstructWriterEvent(storey.MapClass):
                 event[WriterEvent.END_INFER_TIME]
             )
             if WriterEvent.END_APP_PROCESS_TIME in event:
-                result_event[WriterEvent.END_APP_PROCESS_TIME] = datetime.fromisoformat(event[WriterEvent.END_APP_PROCESS_TIME])
+                result_event[WriterEvent.END_APP_PROCESS_TIME] = datetime.fromisoformat(
+                    event[WriterEvent.END_APP_PROCESS_TIME]
+                )
         if kind == WriterEventKind.STATS:
             result_event[StatsData.STATS] = json.dumps(result_event[StatsData.STATS])
         return result_event
@@ -378,7 +380,11 @@ class KindChoice(storey.Choice):
         if kind == WriterEventKind.METRIC:
             outlets = ["tsdb_metrics", "writer_lag_events_generator"]
         elif kind == WriterEventKind.RESULT:
-            outlets = ["tsdb_app_results", "alert_generator", "writer_lag_events_generator"]
+            outlets = [
+                "tsdb_app_results",
+                "alert_generator",
+                "writer_lag_events_generator",
+            ]
         elif kind == WriterEventKind.STATS:
             outlets = ["stats_writer"]
         else:
