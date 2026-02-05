@@ -344,9 +344,10 @@ class MarketplaceAgentDeployer:
 
         temp_func_name = f"{self.name}-base-temp"
 
-        # Create temporary function for building base image
+        # Create temporary JOB function for building (job functions support builds)
+        # We use 'job' kind instead of 'application' because application doesn't support .deploy() for build-only
         base_func = project_obj.set_function(
-            kind="application",
+            kind="job",
             image=base_image or self._agent_asset.default_base_image,
             name=temp_func_name,
         )
@@ -366,10 +367,13 @@ class MarketplaceAgentDeployer:
             base_func.spec.build.extra = build_extra_commands
 
         # Build the image
-        base_func.build()
+        ready = base_func.build(skip_deployed=True, watch=True)
 
-        # Get the built image URI
-        built_image = base_func.spec.image
+        # Get the built image URI from build status
+        if ready:
+            built_image = base_func.spec.build.image or base_func.spec.image
+        else:
+            built_image = base_func.spec.image
         self._built_base_image = built_image
 
         # Clean up temporary function from project
@@ -419,9 +423,9 @@ class MarketplaceAgentDeployer:
 
         temp_func_name = f"{self.name}-source-temp"
 
-        # Create function with base image and source
+        # Create JOB function with base image and source
         source_func = project_obj.set_function(
-            kind="application",
+            kind="job",
             image=base_image_with_requirements,
             name=temp_func_name,
         )
@@ -437,10 +441,13 @@ class MarketplaceAgentDeployer:
             source_func.spec.build.extra = build_extra_commands
 
         # Build the image
-        source_func.build()
+        ready = source_func.build(skip_deployed=True, watch=True)
 
-        # Get the built image URI
-        built_image = source_func.spec.image
+        # Get the built image URI from build status
+        if ready:
+            built_image = source_func.spec.build.image or source_func.spec.image
+        else:
+            built_image = source_func.spec.image
         self._built_final_image = built_image
 
         # Clean up temporary function from project
