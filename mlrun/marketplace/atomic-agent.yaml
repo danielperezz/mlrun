@@ -1,0 +1,56 @@
+name: 'atomic-agent'
+author: 'McKinsey'
+kind: 'atomic-agent'
+version: '0.0.1'
+description: 'Atomic Agent powered by LangChain and A2A protocol for natural language processing'
+categories:
+  - 'agents'
+  - 'ai'
+  - 'nlp'
+agent_info:
+  protocol: 'A2A'
+  framework: 'LangChain'
+consumption_config:
+  build:
+    requirements: []  # Loaded from requirements.txt
+    default_base_image: 'mlrun/mlrun'
+    default_workdir: '/home/mlrun_code/'
+    build_extra: ''
+  deploy:
+    default_port: 10000
+    default_command: 'sh'
+    default_args:
+      - '-c'
+      - 'PYTHONPATH=/home/mlrun_code/atomic_agent python -m atomic_agent'
+    default_direct_pod: false
+  inputs:
+    - name: AGENT_CONFIG_PATH
+      type: env
+      required: false
+      default: '/home/mlrun_code/atomic_agent/config/agent.yaml'
+    - name: REDIS_HOST
+      type: env
+      required: false
+      default: 'redis-master.default-tenant.svc.cluster.local'
+    - name: REDIS_PASSWORD
+      type: env
+      required: false
+      default: 'mlrun'
+    - name: AGENT_HOST
+      type: env
+      required: false
+      default: 'nuclio-mlrun-x-atomic-agent-atomic-agent.default-tenant.svc.cluster.local'
+    - name: AGENT_PORT
+      type: env
+      required: false
+      default: '10000'
+    - name: UV_SYSTEM_PYTHON
+      type: env
+      required: false
+      default: '1'
+    - name: OPENAI_BASE_URL
+      type: env
+      required: true
+    - name: OPENAI_API_KEY
+      type: secret
+      required: true

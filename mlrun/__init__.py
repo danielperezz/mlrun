@@ -17,6 +17,8 @@ __all__ = [
     "set_environment",
     "code_to_function",
     "import_function",
+    "import_agent",
+    "deploy_agent",
     "handler",
     "ArtifactType",
     "get_secret_or_env",
@@ -40,6 +42,7 @@ from .db import get_run_db
 from .errors import MLRunInvalidArgumentError, MLRunNotFoundError
 from .execution import MLClientCtx
 from .hub import get_hub_item, get_hub_module, get_hub_step, import_module
+from .marketplace import deploy_agent, import_agent
 from .model import RunObject, RunTemplate, new_task
 from .package import ArtifactType, DefaultPackager, Packager
 from .projects import (
