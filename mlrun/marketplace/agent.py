@@ -104,7 +104,9 @@ class MarketplaceBackend:
             framework=config["agent_info"]["framework"],
             asset_url="",  # Will be provided during deployment
             requirements=build_config.get("requirements", []),
-            default_base_image=build_config.get("default_base_image", "mlrun/mlrun"),
+            default_base_image=build_config.get(
+                "default_base_image"
+            ),  # None if not specified
             default_port=deploy_config.get("default_port", 8080),
             default_command=deploy_config.get("default_command", ""),
             default_args=deploy_config.get("default_args", []),
@@ -365,9 +367,12 @@ class MarketplaceAgentDeployer:
 
         # Set up application function
         # Application runtime handles build optimization automatically via requires_build()
+        # Determine base image: user override > agent default > None (runtime uses its default)
+        base_image = kwargs.get("base_image") or self._agent_asset.default_base_image
+
         app = project_obj.set_function(
             kind="application",
-            image=kwargs.get("base_image") or self._agent_asset.default_base_image,
+            image=base_image,  # None is valid - runtime will use its default
             name=self.name,
         )
 
