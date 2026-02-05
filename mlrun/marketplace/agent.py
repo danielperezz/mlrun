@@ -220,10 +220,6 @@ class MarketplaceAgentDeployer:
         self.inputs_keys = [inp["name"] for inp in agent_asset.inputs]
         self._agent_asset = agent_asset
 
-        # Track built images for optimization
-        self._built_base_image = None  # Image with requirements only
-        self._built_final_image = None  # Image with requirements + source
-
     def info(self) -> str:
         """
         Get information about the agent.
@@ -313,190 +309,23 @@ class MarketplaceAgentDeployer:
 
         return "\n".join(commands) + "\n" if commands else None
 
-    def _build_base_image(
-        self,
-        project_obj: mlrun.projects.MlrunProject,
-        base_image: Optional[str] = None,
-        requirements: Optional[Any] = None,
-    ) -> str:
-        """
-        Build base image with requirements only (internal method).
-
-        This is an optimization step to avoid rebuilding requirements on every deployment.
-        The built image is cached in self._built_base_image for reuse.
-
-        :param project_obj: MLRun project object
-        :param base_image: Optional base image to use (defaults to agent's default)
-        :param requirements: Optional requirements list or file path (overrides default)
-        :return: Built base image URI
-        """
-        # Determine requirements to use
-        reqs = (
-            requirements if requirements is not None else self._agent_asset.requirements
-        )
-        reqs_count = len(reqs) if isinstance(reqs, list) else "from file"
-
-        logger.info(
-            "Building base image with requirements",
-            agent=self.name,
-            requirements_count=reqs_count,
-        )
-
-        temp_func_name = f"{self.name}-base-temp"
-
-        # Create temporary JOB function for building (job functions support builds)
-        # We use 'job' kind instead of 'application' because application doesn't support .deploy() for build-only
-        base_func = project_obj.set_function(
-            kind="job",
-            image=base_image or self._agent_asset.default_base_image,
-            name=temp_func_name,
-        )
-
-        # Add requirements
-        if reqs:
-            if isinstance(reqs, str):
-                # File path
-                base_func.with_requirements(requirements_file=reqs)
-            else:
-                # List of requirements
-                base_func.with_requirements(requirements=reqs)
-
-        # Add build extra commands (WORKDIR, etc.)
-        build_extra_commands = self._get_build_extra_commands()
-        if build_extra_commands:
-            base_func.spec.build.extra = build_extra_commands
-
-        # Build the image
-        ready = base_func.build(skip_deployed=True, watch=True)
-
-        # Get the built image URI from build status
-        if ready:
-            built_image = base_func.spec.build.image or base_func.spec.image
-        else:
-            built_image = base_func.spec.image
-        self._built_base_image = built_image
-
-        # Clean up temporary function from project
-        try:
-            project_obj.delete_function(temp_func_name)
-            logger.debug(
-                "Cleaned up temporary base build function",
-                agent=self.name,
-                temp_function=temp_func_name,
-            )
-        except Exception as exc:
-            logger.warning(
-                "Failed to clean up temporary function",
-                agent=self.name,
-                temp_function=temp_func_name,
-                error=mlrun.errors.err_to_str(exc),
-            )
-
-        logger.info(
-            "Base image built successfully",
-            agent=self.name,
-            image=built_image,
-        )
-
-        return built_image
-
-    def _build_with_source(
-        self,
-        project_obj: mlrun.projects.MlrunProject,
-        base_image_with_requirements: str,
-    ) -> str:
-        """
-        Build image with source archive on top of base image (internal method).
-
-        This adds the agent source code to the pre-built base image with requirements.
-        The built image is cached in self._built_final_image for reuse.
-
-        :param project_obj: MLRun project object
-        :param base_image_with_requirements: Base image with requirements pre-installed
-        :return: Built final image URI
-        """
-        logger.info(
-            "Building image with source archive",
-            agent=self.name,
-            base_image=base_image_with_requirements,
-        )
-
-        temp_func_name = f"{self.name}-source-temp"
-
-        # Create JOB function with base image and source
-        source_func = project_obj.set_function(
-            kind="job",
-            image=base_image_with_requirements,
-            name=temp_func_name,
-        )
-
-        # Add source archive
-        source_func.with_source_archive(
-            source=self._agent_asset.asset_url, pull_at_runtime=False
-        )
-
-        # Add build extra commands (WORKDIR, etc.)
-        build_extra_commands = self._get_build_extra_commands()
-        if build_extra_commands:
-            source_func.spec.build.extra = build_extra_commands
-
-        # Build the image
-        ready = source_func.build(skip_deployed=True, watch=True)
-
-        # Get the built image URI from build status
-        if ready:
-            built_image = source_func.spec.build.image or source_func.spec.image
-        else:
-            built_image = source_func.spec.image
-        self._built_final_image = built_image
-
-        # Clean up temporary function from project
-        try:
-            project_obj.delete_function(temp_func_name)
-            logger.debug(
-                "Cleaned up temporary source build function",
-                agent=self.name,
-                temp_function=temp_func_name,
-            )
-        except Exception as exc:
-            logger.warning(
-                "Failed to clean up temporary function",
-                agent=self.name,
-                temp_function=temp_func_name,
-                error=mlrun.errors.err_to_str(exc),
-            )
-
-        logger.info(
-            "Image with source built successfully",
-            agent=self.name,
-            image=built_image,
-        )
-
-        return built_image
-
     def deploy(
         self,
         project: str,
         source: Optional[str] = None,
-        base_image_with_requirements: Optional[str] = None,
         gateway_config: Optional[dict[str, Any]] = None,
         **kwargs,
     ):
         """
         Deploy the agent as an MLRun application runtime.
 
-        This method automatically optimizes the build process:
-        1. If base_image_with_requirements is provided, uses it directly
-        2. Otherwise, checks if a base image was already built and reuses it
-        3. If no cached images exist, builds from scratch (base + source)
-
-        This transparent optimization significantly speeds up redeployments when
-        only configurations change.
+        Builds and deploys the agent with requirements and source code.
+        The application runtime automatically optimizes builds using:
+        - Docker layer caching for unchanged requirements/source
+        - requires_build() check to skip unnecessary rebuilds
 
         :param project: MLRun project name
         :param source: Source archive URL/path (required if not set in agent asset)
-        :param base_image_with_requirements: Pre-built image with requirements
-            (skips requirement installation if provided)
         :param gateway_config: API gateway configuration dict. If provided,
             creates an API gateway with these settings. Supports:
             - name: Gateway name (default: "{agent_name}-gateway")
@@ -534,60 +363,35 @@ class MarketplaceAgentDeployer:
         # Get or create project
         project_obj = mlrun.get_or_create_project(project)
 
-        # Determine which image to use (transparent optimization)
-        if base_image_with_requirements:
-            # User provided pre-built image
-            logger.info(
-                "Using provided base image with requirements",
-                agent=self.name,
-                image=base_image_with_requirements,
-            )
-            final_image = base_image_with_requirements
-            needs_source = True
-        elif self._built_final_image:
-            # Already built complete image (requirements + source)
-            logger.info(
-                "Reusing cached image with requirements and source",
-                agent=self.name,
-                image=self._built_final_image,
-            )
-            final_image = self._built_final_image
-            needs_source = False
-        elif self._built_base_image:
-            # Have base image, need to add source
-            logger.info(
-                "Reusing cached base image, building with source",
-                agent=self.name,
-                base_image=self._built_base_image,
-            )
-            final_image = self._build_with_source(project_obj, self._built_base_image)
-            needs_source = False
-        else:
-            # Build from scratch: base + source
-            logger.info(
-                "Building from scratch (base + source)",
-                agent=self.name,
-            )
-            base_image = self._build_base_image(
-                project_obj,
-                kwargs.get("base_image"),
-                kwargs.get("requirements"),
-            )
-            final_image = self._build_with_source(project_obj, base_image)
-            needs_source = False
-
-        # Set up application function for deployment
+        # Set up application function
+        # Application runtime handles build optimization automatically via requires_build()
         app = project_obj.set_function(
             kind="application",
-            image=final_image,
+            image=kwargs.get("base_image") or self._agent_asset.default_base_image,
             name=self.name,
         )
 
-        # Add source if using pre-built base image
-        if needs_source:
-            app.with_source_archive(
-                source=self._agent_asset.asset_url, pull_at_runtime=False
-            )
+        # Add requirements
+        reqs = kwargs.get("requirements")
+        if reqs is not None:
+            # User provided override
+            if isinstance(reqs, str):
+                app.with_requirements(requirements_file=reqs)
+            else:
+                app.with_requirements(requirements=reqs)
+        elif self._agent_asset.requirements:
+            # Use default from agent asset
+            app.with_requirements(requirements=self._agent_asset.requirements)
+
+        # Add source archive
+        app.with_source_archive(
+            source=self._agent_asset.asset_url, pull_at_runtime=False
+        )
+
+        # Add build extra commands (WORKDIR, etc.)
+        build_extra_commands = self._get_build_extra_commands()
+        if build_extra_commands:
+            app.spec.build.extra = build_extra_commands
 
         # Configure application port
         app.set_internal_application_port(
