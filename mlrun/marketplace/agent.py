@@ -29,121 +29,34 @@ import mlrun
 import mlrun.errors
 from mlrun.utils import logger
 
-
-class MarketplaceBackend:
+class MarketplaceAgent:
     """
-    Marketplace Backend for loading agent configurations.
+    Agent deployer for marketplace agents.
 
-    Currently loads from YAML files on disk. In production, this will
-    connect to the marketplace assets database.
-    """
-
-    # Class variable to store custom YAML directory
-    _yaml_directory: Optional[str] = None
-
-    @classmethod
-    def set_yaml_directory(cls, directory: str):
-        """
-        Set custom directory for loading agent YAML files (for testing).
-
-        :param directory: Path to directory containing agent YAML files
-        """
-        cls._yaml_directory = directory
-
-    @staticmethod
-    def get(name: str, project: Optional[str] = None) -> "AgentAsset":
-        """
-        Retrieve agent asset from marketplace.
-
-        Currently loads from YAML files. Supports:
-        - "marketplace://agent-name:version" format
-        - Direct agent name (uses default version)
-
-        :param name: Agent name (e.g., "marketplace://atomic-agent:0.0.1" or "atomic-agent")
-        :param project: Optional project context
-        :return: AgentAsset instance
-        """
-        # Parse agent name
-        if name.startswith("marketplace://"):
-            agent_name = name.replace("marketplace://", "").split(":")[0]
-        else:
-            agent_name = name
-
-        # Determine YAML directory
-        if MarketplaceBackend._yaml_directory:
-            yaml_dir = pathlib.Path(MarketplaceBackend._yaml_directory)
-        else:
-            # Default: look in mlrun/marketplace directory
-            yaml_dir = pathlib.Path(__file__).parent
-
-        # Load YAML file
-        yaml_path = yaml_dir / f"{agent_name}.yaml"
-        if not yaml_path.exists():
-            raise mlrun.errors.MLRunNotFoundError(
-                f"Agent '{agent_name}' not found. "
-                f"Expected YAML file at: {yaml_path}"
-            )
-
-        logger.info("Loading agent from YAML", agent=agent_name, path=str(yaml_path))
-
-        with open(yaml_path) as f:
-            config = yaml.safe_load(f)
-
-        # Extract configuration
-        build_config = config["consumption_config"]["build"]
-        deploy_config = config["consumption_config"]["deploy"]
-
-        # Create AgentAsset
-        return AgentAsset(
-            name=config["name"],
-            version=config["version"],
-            author=config["author"],
-            description=config["description"],
-            kind=config["kind"],
-            protocol=config["agent_info"]["protocol"],
-            framework=config["agent_info"]["framework"],
-            asset_url="",  # Will be provided during deployment
-            requirements=build_config.get("requirements", []),
-            default_base_image=build_config.get(
-                "default_base_image"
-            ),  # None if not specified
-            default_port=deploy_config.get("default_port", 8080),
-            default_command=deploy_config.get("default_command", ""),
-            default_args=deploy_config.get("default_args", []),
-            inputs=config["consumption_config"].get("inputs", []),
-            categories=config.get("categories", []),
-            default_workdir=build_config.get("default_workdir"),
-            build_extra=build_config.get("build_extra"),
-        )
-
-
-class AgentAsset:
-    """
-    Represents an agent asset retrieved from the marketplace.
-
-    Contains all the metadata and configuration needed to deploy the agent,
-    including build requirements, deployment defaults, and input specifications.
+    This class provides methods to get information about an agent and deploy it
+    as an MLRun application runtime. It automatically optimizes the build process
+    by caching base images with requirements and reusing them across deployments.
     """
 
     def __init__(
-        self,
-        name: str,
-        version: str,
-        author: str,
-        description: str,
-        kind: str,
-        protocol: str,
-        framework: str,
-        asset_url: str,
-        requirements: list[str],
-        default_base_image: str,
-        default_port: int,
-        default_command: str,
-        default_args: list[str],
-        inputs: list[dict[str, Any]],
-        categories: Optional[list[str]] = None,
-        default_workdir: Optional[str] = None,
-        build_extra: Optional[str] = None,
+            self,
+            name: str,
+            version: str,
+            author: str,
+            description: str,
+            kind: str,
+            protocol: str,
+            framework: str,
+            asset_url: str,
+            requirements: list[str],
+            default_base_image: str,
+            default_port: int,
+            default_command: str,
+            default_args: list[str],
+            inputs: list[dict[str, Any]],
+            categories: Optional[list[str]] = None,
+            default_workdir: Optional[str] = None,
+            build_extra: Optional[str] = None,
     ):
         """
         Initialize AgentAsset with marketplace metadata.
@@ -192,42 +105,17 @@ class AgentAsset:
             if inp.get("required", False) and not inp.get("default")
         ]
 
-
-class MarketplaceAgentDeployer:
-    """
-    Agent deployer for marketplace agents.
-
-    This class provides methods to get information about an agent and deploy it
-    as an MLRun application runtime. It automatically optimizes the build process
-    by caching base images with requirements and reusing them across deployments.
-    """
-
-    def __init__(self, agent_asset: AgentAsset):
-        """
-        Initialize MarketplaceAgentDeployer with agent asset metadata.
-
-        :param agent_asset: AgentAsset instance from marketplace
-        """
-        self.name = agent_asset.name
-        self.version = agent_asset.version
-        self.description = agent_asset.description
-        self.protocol = agent_asset.protocol
-        self.framework = agent_asset.framework
-        self.author = agent_asset.author
-        self.kind = agent_asset.kind
-        self.inputs_keys = [inp["name"] for inp in agent_asset.inputs]
-        self._agent_asset = agent_asset
-
     def info(self) -> str:
         """
         Get information about the agent.
 
         :return: Formatted string with agent information
         """
+        inputs_keys = [inp["name"] for inp in self.inputs]
         optional_inputs = [
             k
-            for k in self.inputs_keys
-            if k not in self._agent_asset.mandatory_configurations
+            for k in inputs_keys
+            if k not in self.mandatory_configurations
         ]
 
         info_str = (
@@ -239,7 +127,7 @@ class MarketplaceAgentDeployer:
             f"Framework: {self.framework}\n"
             f"Protocol: {self.protocol}\n"
             f"Required Inputs: "
-            f"{', '.join(self._agent_asset.mandatory_configurations)}\n"
+            f"{', '.join(self.mandatory_configurations)}\n"
             f"Optional Inputs: {', '.join(optional_inputs)}"
         )
         print(info_str)
@@ -275,7 +163,7 @@ class MarketplaceAgentDeployer:
             )
 
         # Process all inputs (apply defaults for optional ones)
-        for inp in self._agent_asset.inputs:
+        for inp in self.inputs:
             key = inp["name"]
             if key in kwargs:
                 # User provided value
@@ -298,29 +186,28 @@ class MarketplaceAgentDeployer:
         commands = []
 
         # Add WORKDIR if specified
-        if self._agent_asset.default_workdir:
-            commands.append(f"WORKDIR {self._agent_asset.default_workdir}")
+        if self.default_workdir:
+            commands.append(f"WORKDIR {self.default_workdir}")
 
         # Add any additional build extra commands
-        if self._agent_asset.build_extra:
-            commands.append(self._agent_asset.build_extra.rstrip())
+        if self.build_extra:
+            commands.append(self.build_extra.rstrip())
 
         return "\n".join(commands) + "\n" if commands else None
 
     def deploy(
         self,
         project: str,
-        source: Optional[str] = None,
+        source_url: Optional[str] = None, # todo: delete when there is backend (request source from BE inside this function)
         gateway_config: Optional[dict[str, Any]] = None,
         **kwargs,
     ):
         """
-        Deploy the agent as an MLRun application runtime.
+        Deploy the marketplace agent as an MLRun application runtime.
 
         Builds and deploys the agent with requirements and source code.
 
         :param project: MLRun project name
-        :param source: Source archive URL/path (required if not set in agent asset)
         :param gateway_config: API gateway configuration dict. If provided,
             creates an API gateway with these settings. Supports:
             - name: Gateway name (default: "{agent_name}-gateway")
@@ -338,20 +225,17 @@ class MarketplaceAgentDeployer:
             - requirements: Override default requirements list or file path
             - create_default_api_gateway: Whether to create default API gateway
                 (default: False, ignored if gateway_config is provided)
-            - Any input configurations (secrets/env vars) as specified in
-                agent's inputs
+            - Any input configurations as specified in agent's inputs:
+                - Inputs with type="secret" are stored in project secrets with
+                  prefixed keys (mlrun-agent-{agent_name}-{key}) to avoid
+                  collision with existing project secrets, then referenced
+                  securely via Kubernetes secrets
+                - Inputs with type="env" are set as regular environment variables
         :return: Deployment URL for invoking the agent
         """
-        # Set source URL if provided
-        if source:
-            self._agent_asset.asset_url = source
-        elif not self._agent_asset.asset_url:
-            raise mlrun.errors.MLRunInvalidArgumentError(
-                "Source archive must be provided either in agent asset or as 'source' parameter"
-            )
         # Validate mandatory configurations
         configs = self._validate_mandatory_configs(
-            kwargs, self._agent_asset.mandatory_configurations
+            kwargs, self.mandatory_configurations
         )
 
         # Get or create project
@@ -360,7 +244,7 @@ class MarketplaceAgentDeployer:
         # Set up application function
         # Application runtime handles build optimization automatically via requires_build()
         # Determine base image: user override > agent default > None (runtime uses its default)
-        base_image = kwargs.get("base_image") or self._agent_asset.default_base_image
+        base_image = kwargs.get("base_image") or self.default_base_image
 
         app = project_obj.set_function(
             kind="application",
@@ -376,13 +260,14 @@ class MarketplaceAgentDeployer:
                 app.with_requirements(requirements_file=reqs)
             else:
                 app.with_requirements(requirements=reqs)
-        elif self._agent_asset.requirements:
+        elif self.requirements:
             # Use default from agent asset
-            app.with_requirements(requirements=self._agent_asset.requirements)
+            app.with_requirements(requirements=self.requirements)
 
+        # todo: request source from the backend (and log it as an artifact?)
         # Add source archive
         app.with_source_archive(
-            source=self._agent_asset.asset_url, pull_at_runtime=False
+            source=source_url, pull_at_runtime=False
         )
 
         # Add build extra commands (WORKDIR, etc.)
@@ -392,15 +277,45 @@ class MarketplaceAgentDeployer:
 
         # Configure application port
         app.set_internal_application_port(
-            kwargs.get("port") or self._agent_asset.default_port
+            kwargs.get("port") or self.default_port
         )
 
         # Configure command and args
-        app.spec.command = kwargs.get("command") or self._agent_asset.default_command
-        app.spec.args = kwargs.get("args") or self._agent_asset.default_args
+        app.spec.command = kwargs.get("command") or self.default_command
+        app.spec.args = kwargs.get("args") or self.default_args
 
-        # Set environment variables from configs
+        # Separate configs into environment variables and secrets based on input type
+        env_vars = {}
+        secrets = {}
+
         for key, value in configs.items():
+            # Find the input definition to check if it's a secret
+            input_def = next((inp for inp in self.inputs if inp["name"] == key), None)
+            if input_def and input_def.get("type") == "secret":
+                secrets[key] = value
+            else:
+                env_vars[key] = value
+
+        # Store secrets with prefixed keys to avoid collision with existing project secrets
+        # Prefix format: "mlrun-agent-{agent_name}-{secret_key}"
+        if secrets:
+            prefixed_secrets = {}
+            for key, value in secrets.items():
+                prefixed_key = f"mlrun-agent-{self.name}-{key}"
+                prefixed_secrets[prefixed_key] = value
+
+            # Store prefixed secrets in project secret store
+            project_obj.set_secrets(prefixed_secrets)
+
+            # Reference secrets with original (non-prefixed) env var names
+            for key in secrets.keys():
+                prefixed_key = f"mlrun-agent-{self.name}-{key}"
+                # Env var name in container is original key (e.g., "OPENAI_API_KEY")
+                # Secret reference uses prefixed key (e.g., "mlrun-agent-atomic-agent-OPENAI_API_KEY")
+                app.set_env_from_secret(key, secret=project, secret_key=prefixed_key)
+
+        # Set regular environment variables
+        for key, value in env_vars.items():
             app.set_env(key, value)
 
         # Deploy application
@@ -437,46 +352,45 @@ class MarketplaceAgentDeployer:
 
         return deployment_url
 
-
-def import_agent(name: str) -> MarketplaceAgentDeployer:
+# todo: get the metadata from the backend using name once it's implemented
+def import_agent(name: str, agent_metadata) -> MarketplaceAgent:
     """
     Import an agent from the MLRun marketplace.
 
     :param name: Agent name (e.g., "marketplace://atomic-writer:0.0.1")
-    :return: MarketplaceAgentDeployer instance
+    :return: MarketplaceAgent instance
 
     Example:
         >>> agent = mlrun.import_agent("marketplace://atomic-writer:0.0.1")
         >>> agent.info()
         >>> agent.deploy(project="my-project", OPENAI_API_KEY="sk-...", ...)
     """
-    agent_asset = MarketplaceBackend.get(name)
-    return MarketplaceAgentDeployer(agent_asset)
+    # agent_metadata = MarketplaceBackend.get_asset_metadata(name) # todo: wire with actual backend call to get metadata
+    return MarketplaceAgent(agent_metadata)
 
 
 def deploy_agent(
     name: str,
     project: str,
-    source: Optional[str] = None,
+    source: Optional[str] = None, #todo: delete when there is backend to get it from
     gateway_config: Optional[dict[str, Any]] = None,
     **kwargs,
 ):
     """
-    Convenience function to import and deploy an agent in one call.
-
-    This function is designed for simple, one-time deployments. For reusing
-    built images across multiple deployments, use import_agent() and call
-    deploy() multiple times on the same agent instance.
+    Deploy agent frm the marketplace as an MLRun application runtime in a single step.
 
     :param name: Agent name (e.g., "marketplace://atomic-writer:0.0.1")
     :param project: MLRun project name
-    :param source: Source archive URL/path (required if not set in agent asset)
+    :param source: Source archive URL/path (optional - auto-downloads from marketplace if not provided)
     :param gateway_config: API gateway configuration dict
         (see MarketplaceAgentDeployer.deploy for details)
     :param kwargs: Additional configuration options including:
         - base_image: Override default base image (e.g., "ubuntu:22.04")
         - requirements: Override requirements (list or file path)
-        - Any input configurations (secrets/env vars)
+        - Any input configurations as specified in agent's inputs:
+            - Inputs with type="secret" are stored securely in project secrets
+              with prefixed keys to prevent collision (mlrun-agent-{agent_name}-{key})
+            - Inputs with type="env" are set as regular environment variables
         (see MarketplaceAgentDeployer.deploy for full options)
     :return: Deployment URL for invoking the agent
 
@@ -484,19 +398,18 @@ def deploy_agent(
         >>> mlrun.deploy_agent(
         ...     "marketplace://atomic-writer:0.0.1",
         ...     project="my-project",
-        ...     source="v3io:///projects/my-project/artifacts/agent.tar.gz",
         ...     gateway_config={
         ...         "authentication_mode": "none",
         ...         "path": "/",
         ...         "ssl_redirect": True,
         ...     },
-        ...     OPENAI_API_KEY="sk-...",
+        ...     OPENAI_API_KEY="sk-...",  # Stored securely as a secret
         ... )
     """
-    agent_deployer = import_agent(name)
-    return agent_deployer.deploy(
+    mp_agent = import_agent(name)
+    return mp_agent.deploy(
         project=project,
-        source=source,
+        source=source, # todo: delete when there is backend (the source will be requested from thr BE by deploy())
         gateway_config=gateway_config,
         **kwargs,
     )
