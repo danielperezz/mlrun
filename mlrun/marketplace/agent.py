@@ -409,7 +409,7 @@ def deploy_agent(
     mp_agent = import_agent(name)
     return mp_agent.deploy(
         project=project,
-        source=source, # todo: delete when there is backend (the source will be requested from thr BE by deploy())
+        source_url=source, # todo: delete when there is backend (the source will be requested from thr BE by deploy())
         gateway_config=gateway_config,
         **kwargs,
     )
