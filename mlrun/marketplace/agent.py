@@ -110,7 +110,6 @@ class MarketplaceBackend:
             default_port=deploy_config.get("default_port", 8080),
             default_command=deploy_config.get("default_command", ""),
             default_args=deploy_config.get("default_args", []),
-            default_direct_pod=deploy_config.get("default_direct_pod", False),
             inputs=config["consumption_config"].get("inputs", []),
             categories=config.get("categories", []),
             default_workdir=build_config.get("default_workdir"),
@@ -141,7 +140,6 @@ class AgentAsset:
         default_port: int,
         default_command: str,
         default_args: list[str],
-        default_direct_pod: bool,
         inputs: list[dict[str, Any]],
         categories: Optional[list[str]] = None,
         default_workdir: Optional[str] = None,
@@ -163,7 +161,6 @@ class AgentAsset:
         :param default_port: Default application port
         :param default_command: Default command to run
         :param default_args: Default command arguments
-        :param default_direct_pod: Default direct pod access setting
         :param inputs: List of input configurations (secrets/env vars)
         :param categories: Optional list of categories
         :param default_workdir: Optional default working directory for build
@@ -182,7 +179,6 @@ class AgentAsset:
         self.default_port = default_port
         self.default_command = default_command
         self.default_args = default_args
-        self.default_direct_pod = default_direct_pod
         self.inputs = inputs
         self.categories = categories or []
         self.default_workdir = default_workdir
@@ -322,9 +318,6 @@ class MarketplaceAgentDeployer:
         Deploy the agent as an MLRun application runtime.
 
         Builds and deploys the agent with requirements and source code.
-        The application runtime automatically optimizes builds using:
-        - Docker layer caching for unchanged requirements/source
-        - requires_build() check to skip unnecessary rebuilds
 
         :param project: MLRun project name
         :param source: Source archive URL/path (required if not set in agent asset)
@@ -343,7 +336,6 @@ class MarketplaceAgentDeployer:
             - command: Override default command
             - args: Override default args
             - requirements: Override default requirements list or file path
-            - direct_pod: Override default direct pod access
             - create_default_api_gateway: Whether to create default API gateway
                 (default: False, ignored if gateway_config is provided)
             - Any input configurations (secrets/env vars) as specified in
