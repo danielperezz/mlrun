@@ -314,7 +314,7 @@ class MarketplaceAgent:
             if not gateway_config
             else False
         )
-        app.deploy(with_mlrun=False, create_default_api_gateway=create_default_gateway)
+        app.deploy(with_mlrun=False, create_default_api_gateway=create_default_gateway, show_on_failure=True)
 
         # Create API gateway if config is provided
         if gateway_config:
