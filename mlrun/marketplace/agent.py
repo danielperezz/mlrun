@@ -226,11 +226,10 @@ class MarketplaceAgent:
             - create_default_api_gateway: Whether to create default API gateway
                 (default: False, ignored if gateway_config is provided)
             - Any input configurations as specified in agent's inputs:
-                - Inputs with type="secret" are stored in project secrets with
-                  prefixed keys (mlrun-agent-{agent_name}-{key}) to avoid
-                  collision with existing project secrets, then referenced
-                  securely via Kubernetes secrets
+                - Inputs with type="secret" are stored in project secrets
+                  and set as environment variables
                 - Inputs with type="env" are set as regular environment variables
+                - Note: All functions in a project share the same secrets
         :return: Deployment URL for invoking the agent
         """
         # Validate mandatory configurations
@@ -296,23 +295,13 @@ class MarketplaceAgent:
             else:
                 env_vars[key] = value
 
-        # Store secrets with prefixed keys to avoid collision with existing project secrets
-        # Prefix format: "mlrun-agent-{agent_name}-{secret_key}"
+        # Store secrets in project secrets
+        # MLRun automatically mounts project secrets to pods
+        # Assumption: All functions in a project share the same secrets (no collision)
         if secrets:
-            prefixed_secrets = {}
-            for key, value in secrets.items():
-                prefixed_key = f"mlrun-agent-{self.name}-{key}"
-                prefixed_secrets[prefixed_key] = value
-
-            # Store prefixed secrets in project secret store
-            project_obj.set_secrets(prefixed_secrets)
-
-            # Reference secrets with original (non-prefixed) env var names
-            for key in secrets.keys():
-                prefixed_key = f"mlrun-agent-{self.name}-{key}"
-                # Env var name in container is original key (e.g., "OPENAI_API_KEY")
-                # Secret reference uses prefixed key (e.g., "mlrun-agent-atomic-agent-OPENAI_API_KEY")
-                app.set_env_from_secret(key, secret=project, secret_key=prefixed_key)
+            # Store secrets in project secret store
+            project_obj.set_secrets(secrets)
+            # Secrets will be automatically available as env vars in the pod
 
         # Set regular environment variables
         for key, value in env_vars.items():
@@ -389,9 +378,9 @@ def deploy_agent(
         - base_image: Override default base image (e.g., "ubuntu:22.04")
         - requirements: Override requirements (list or file path)
         - Any input configurations as specified in agent's inputs:
-            - Inputs with type="secret" are stored securely in project secrets
-              with prefixed keys to prevent collision (mlrun-agent-{agent_name}-{key})
+            - Inputs with type="secret" are stored in project secrets
             - Inputs with type="env" are set as regular environment variables
+            - Note: All functions in a project share the same secrets
         (see MarketplaceAgentDeployer.deploy for full options)
     :return: Deployment URL for invoking the agent
 
