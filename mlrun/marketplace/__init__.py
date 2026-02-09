@@ -15,17 +15,13 @@
 """MLRun Marketplace - Agent deployment and management."""
 
 from .agent import (
-    AgentAsset,
-    MarketplaceAgentDeployer,
-    MarketplaceBackend,
+    MarketplaceAgent,
     deploy_agent,
     import_agent,
 )
 
 __all__ = [
-    "AgentAsset",
-    "MarketplaceAgentDeployer",
-    "MarketplaceBackend",
+    "MarketplaceAgent",
     "import_agent",
     "deploy_agent",
 ]
