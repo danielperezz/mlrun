@@ -272,7 +272,7 @@ class MarketplaceAgent:
                         use_cached_image = True
                         cached_image = existing_image
                         logger.info(
-                            "Reusing cached image from previous deployment",
+                            "Reusing cached base image from previous deployment",
                             agent=self.name,
                             cached_image=cached_image,
                         )
