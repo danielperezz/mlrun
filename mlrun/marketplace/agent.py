@@ -135,44 +135,53 @@ class MarketplaceAgent:
 
     def _validate_mandatory_configs(
         self, kwargs: dict[str, Any], mandatory_configs: list[str]
-    ) -> dict[str, Any]:
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         """
         Validate that all mandatory configurations are provided and apply defaults.
 
+        Separates configs into environment variables and secrets based on input type.
         Mandatory configs (required=true, no default) must be provided by user.
         Optional configs (required=false or has default) use provided value or default.
 
         :param kwargs: User-provided configurations
         :param mandatory_configs: List of mandatory configuration keys
-        :return: Dictionary of validated configurations with defaults applied
+        :return: Tuple of (env_vars, secrets) dictionaries
         :raises MLRunInvalidArgumentError: If mandatory configs are missing
         """
-        configs = {}
+        env_vars = {}
+        secrets = {}
         missing_configs = []
 
         # Check mandatory configs (must be provided)
         for config_key in mandatory_configs:
             if config_key not in kwargs:
                 missing_configs.append(config_key)
-            else:
-                configs[config_key] = kwargs[config_key]
 
         if missing_configs:
             raise mlrun.errors.MLRunInvalidArgumentError(
                 f"Missing mandatory configurations: {', '.join(missing_configs)}"
             )
 
-        # Process all inputs (apply defaults for optional ones)
+        # Process all inputs (apply defaults for optional ones) and separate by type
         for inp in self.inputs:
             key = inp["name"]
+            value = None
+
             if key in kwargs:
                 # User provided value
-                configs[key] = kwargs[key]
-            elif key not in configs and inp.get("default"):
+                value = kwargs[key]
+            elif inp.get("default"):
                 # Use default value if not provided and default exists
-                configs[key] = inp["default"]
+                value = inp["default"]
 
-        return configs
+            # Store in appropriate dict based on type
+            if value is not None:
+                if inp.get("type") == "secret":
+                    secrets[key] = value
+                else:
+                    env_vars[key] = value
+
+        return env_vars, secrets
 
     def _get_build_extra_commands(self) -> Optional[str]:
         """
@@ -232,8 +241,8 @@ class MarketplaceAgent:
                 - Note: All functions in a project share the same secrets
         :return: Deployment URL for invoking the agent
         """
-        # Validate mandatory configurations
-        configs = self._validate_mandatory_configs(
+        # Validate mandatory configurations and separate into env vars and secrets
+        env_vars, secrets = self._validate_mandatory_configs(
             kwargs, self.mandatory_configurations
         )
 
@@ -282,18 +291,6 @@ class MarketplaceAgent:
         # Configure command and args
         app.spec.command = kwargs.get("command") or self.default_command
         app.spec.args = kwargs.get("args") or self.default_args
-
-        # Separate configs into environment variables and secrets based on input type
-        env_vars = {}
-        secrets = {}
-
-        for key, value in configs.items():
-            # Find the input definition to check if it's a secret
-            input_def = next((inp for inp in self.inputs if inp["name"] == key), None)
-            if input_def and input_def.get("type") == "secret":
-                secrets[key] = value
-            else:
-                env_vars[key] = value
 
         # Store secrets in project secrets
         # MLRun automatically mounts project secrets to pods
