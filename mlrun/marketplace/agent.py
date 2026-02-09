@@ -373,6 +373,7 @@ def import_agent(name: str, agent_metadata: dict) -> MarketplaceAgent:
 def deploy_agent(
     name: str,
     project: str,
+    agent_metadata: dict, #todo: delete when there is backend to get it from
     source: Optional[str] = None, #todo: delete when there is backend to get it from
     gateway_config: Optional[dict[str, Any]] = None,
     **kwargs,
@@ -382,7 +383,6 @@ def deploy_agent(
 
     :param name: Agent name (e.g., "marketplace://atomic-writer:0.0.1")
     :param project: MLRun project name
-    :param source: Source archive URL/path (optional - auto-downloads from marketplace if not provided)
     :param gateway_config: API gateway configuration dict
         (see MarketplaceAgentDeployer.deploy for details)
     :param kwargs: Additional configuration options including:
@@ -407,7 +407,7 @@ def deploy_agent(
         ...     OPENAI_API_KEY="sk-...",  # Stored securely as a secret
         ... )
     """
-    mp_agent = import_agent(name)
+    mp_agent = import_agent(name, agent_metadata) # todo: remove metadata parameter when there is backend
     return mp_agent.deploy(
         project=project,
         source_url=source, # todo: delete when there is backend (the source will be requested from thr BE by deploy())
