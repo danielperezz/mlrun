@@ -209,12 +209,15 @@ class MarketplaceAgent:
         project: str,
         source_url: Optional[str] = None, # todo: delete when there is backend (request source from BE inside this function)
         gateway_config: Optional[dict[str, Any]] = None,
+        force_rebuild: bool = False,
         **kwargs,
     ):
         """
         Deploy the marketplace agent as an MLRun application runtime.
 
         Builds and deploys the agent with requirements and source code.
+        On subsequent deployments, reuses cached built image to skip rebuild
+        (unless force_rebuild=True).
 
         :param project: MLRun project name
         :param gateway_config: API gateway configuration dict. If provided,
@@ -226,6 +229,7 @@ class MarketplaceAgent:
             - direct_port_access: Enable direct port access (default: False)
             - ssl_redirect: Enable SSL redirect (default: True)
             - set_as_default: Set as default gateway (default: False)
+        :param force_rebuild: Force rebuild even if cached image exists (default: False)
         :param kwargs: Additional configuration options including:
             - base_image: Override default base image (for initial build)
             - port: Override default port
@@ -249,39 +253,67 @@ class MarketplaceAgent:
         # Get or create project
         project_obj = mlrun.get_or_create_project(project)
 
-        # Set up application function
-        # Application runtime handles build optimization automatically via requires_build()
         # Determine base image: user override > agent default > None (runtime uses its default)
         base_image = kwargs.get("base_image") or self.default_base_image
 
-        app = project_obj.set_function(
-            kind="application",
-            image=base_image,  # None is valid - runtime will use its default
-            name=self.name,
-        )
+        # Try to reuse existing function's built image to avoid rebuilding
+        use_cached_image = False
+        cached_image = None
+        if not force_rebuild:
+            try:
+                existing_func = project_obj.get_function(self.name)
+                existing_image = existing_func.spec.image
+                # Check if it's a built image (not the base image)
+                if existing_image and existing_image != base_image:
+                    use_cached_image = True
+                    cached_image = existing_image
+                    logger.info(
+                        "Reusing cached image from previous deployment",
+                        agent=self.name,
+                        cached_image=cached_image,
+                    )
+            except Exception:
+                # Function doesn't exist or error loading it - will build new
+                pass
 
-        # Add requirements
-        reqs = kwargs.get("requirements")
-        if reqs is not None:
-            # User provided override
-            if isinstance(reqs, str):
-                app.with_requirements(requirements_file=reqs)
-            else:
-                app.with_requirements(requirements=reqs)
-        elif self.requirements:
-            # Use default from agent asset
-            app.with_requirements(requirements=self.requirements)
+        # Set up application function
+        if use_cached_image:
+            # Use cached built image - skip requirements to avoid rebuild
+            app = project_obj.set_function(
+                kind="application",
+                image=cached_image,
+                name=self.name,
+            )
+        else:
+            # First deploy or no cache - build with requirements
+            app = project_obj.set_function(
+                kind="application",
+                image=base_image,  # None is valid - runtime will use its default
+                name=self.name,
+            )
+
+            # Add requirements (only on first build)
+            reqs = kwargs.get("requirements")
+            if reqs is not None:
+                # User provided override
+                if isinstance(reqs, str):
+                    app.with_requirements(requirements_file=reqs)
+                else:
+                    app.with_requirements(requirements=reqs)
+            elif self.requirements:
+                # Use default from agent asset
+                app.with_requirements(requirements=self.requirements)
+
+            # Add build extra commands (WORKDIR, etc.) - only on first build
+            build_extra_commands = self._get_build_extra_commands()
+            if build_extra_commands:
+                app.spec.build.extra = build_extra_commands
 
         # todo: request source from the backend (and log it as an artifact?)
-        # Add source archive
+        # Always add source archive (loaded at runtime via store:// URI)
         app.with_source_archive(
             source=source_url, pull_at_runtime=False
         )
-
-        # Add build extra commands (WORKDIR, etc.)
-        build_extra_commands = self._get_build_extra_commands()
-        if build_extra_commands:
-            app.spec.build.extra = build_extra_commands
 
         # Configure application port
         app.set_internal_application_port(
@@ -362,6 +394,7 @@ def deploy_agent(
     agent_metadata: dict, #todo: delete when there is backend to get it from
     source: Optional[str] = None, #todo: delete when there is backend to get it from
     gateway_config: Optional[dict[str, Any]] = None,
+    force_rebuild: bool = False,
     **kwargs,
 ):
     """
@@ -370,7 +403,8 @@ def deploy_agent(
     :param name: Agent name (e.g., "marketplace://atomic-writer:0.0.1")
     :param project: MLRun project name
     :param gateway_config: API gateway configuration dict
-        (see MarketplaceAgentDeployer.deploy for details)
+        (see MarketplaceAgent.deploy for details)
+    :param force_rebuild: Force rebuild even if cached image exists (default: False)
     :param kwargs: Additional configuration options including:
         - base_image: Override default base image (e.g., "ubuntu:22.04")
         - requirements: Override requirements (list or file path)
@@ -398,5 +432,6 @@ def deploy_agent(
         project=project,
         source_url=source, # todo: delete when there is backend (the source will be requested from thr BE by deploy())
         gateway_config=gateway_config,
+        force_rebuild=force_rebuild,
         **kwargs,
     )
