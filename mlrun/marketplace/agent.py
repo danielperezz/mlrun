@@ -262,16 +262,20 @@ class MarketplaceAgent:
         if not force_rebuild:
             try:
                 existing_func = project_obj.get_function(self.name)
-                existing_image = existing_func.spec.image
-                # Check if it's a built image (not the base image)
-                if existing_image and existing_image != base_image:
-                    use_cached_image = True
-                    cached_image = existing_image
-                    logger.info(
-                        "Reusing cached image from previous deployment",
-                        agent=self.name,
-                        cached_image=cached_image,
-                    )
+
+                # For application runtime, the built image is in the sidecar config
+                sidecars = existing_func.spec.config.get('spec.sidecars', [])
+                if sidecars and len(sidecars) > 0:
+                    existing_image = sidecars[0].get('image')
+                    # Check if it's a built image (not empty and not the base image)
+                    if existing_image and existing_image != base_image:
+                        use_cached_image = True
+                        cached_image = existing_image
+                        logger.info(
+                            "Reusing cached image from previous deployment",
+                            agent=self.name,
+                            cached_image=cached_image,
+                        )
             except Exception:
                 # Function doesn't exist or error loading it - will build new
                 pass
