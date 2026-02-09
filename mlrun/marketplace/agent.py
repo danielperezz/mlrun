@@ -353,20 +353,21 @@ class MarketplaceAgent:
         return deployment_url
 
 # todo: get the metadata from the backend using name once it's implemented
-def import_agent(name: str, agent_metadata) -> MarketplaceAgent:
+def import_agent(name: str, agent_metadata: dict) -> MarketplaceAgent:
     """
     Import an agent from the MLRun marketplace.
 
     :param name: Agent name (e.g., "marketplace://atomic-writer:0.0.1")
+    :param agent_metadata: Agent metadata dict containing all configuration
     :return: MarketplaceAgent instance
 
     Example:
-        >>> agent = mlrun.import_agent("marketplace://atomic-writer:0.0.1")
+        >>> agent = mlrun.import_agent("marketplace://atomic-writer:0.0.1", agent_metadata)
         >>> agent.info()
         >>> agent.deploy(project="my-project", OPENAI_API_KEY="sk-...", ...)
     """
     # agent_metadata = MarketplaceBackend.get_asset_metadata(name) # todo: wire with actual backend call to get metadata
-    return MarketplaceAgent(agent_metadata)
+    return MarketplaceAgent(**agent_metadata)
 
 
 def deploy_agent(
